@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Search, Filter, Leaf, MapPin, Plus, Users, Trophy, LogIn } from 'lucide-react';
+import { Search, Filter, Leaf, MapPin, Plus, Users, Trophy, LogIn, User } from 'lucide-react';
 import { GreenScoreRing } from '@/components/GreenScoreRing';
 
 interface Shop {
@@ -54,6 +54,9 @@ const Index = () => {
           <div className="flex items-center gap-2">
             {user ? (
               <>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/profile')}>
+                  <User className="h-4 w-4 mr-1" /> Profile
+                </Button>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/map')}>
                   <MapPin className="h-4 w-4 mr-1" /> Map
                 </Button>

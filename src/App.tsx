@@ -10,6 +10,7 @@ import AddShop from "./pages/AddShop";
 import ShopDetails from "./pages/ShopDetails";
 import Leaderboard from "./pages/Leaderboard";
 import MapView from "./pages/MapView";
+import CustomerProfile from "./pages/CustomerProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/shop/:id" element={<ShopDetails />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/map" element={<MapView />} />
+            <Route path="/profile" element={<CustomerProfile />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
