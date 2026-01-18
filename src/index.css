@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide Lovable badge completely */
+#lovable-badge,
+[data-lovable-badge],
+.lovable-badge,
+a[href*="lovable.dev"][style*="fixed"],
+body > a[target="_blank"][style*="position: fixed"],
+body > div[style*="position: fixed"][style*="z-index: 999"],
+body > a[style*="z-index: 999"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 @layer base {

@@ -2,13 +2,22 @@ import { useEffect, useState } from 'react';
 
 interface GreenScoreRingProps {
   score: number;
-  size?: number;
+  size?: 'sm' | 'md' | 'lg' | number;
   strokeWidth?: number;
 }
 
-export function GreenScoreRing({ score, size = 180, strokeWidth = 12 }: GreenScoreRingProps) {
+const SIZE_MAP = {
+  sm: 60,
+  md: 120,
+  lg: 180,
+};
+
+export function GreenScoreRing({ score, size = 'md', strokeWidth }: GreenScoreRingProps) {
   const [animatedScore, setAnimatedScore] = useState(0);
-  const radius = (size - strokeWidth) / 2;
+  const numericSize = typeof size === 'number' ? size : SIZE_MAP[size];
+  const defaultStroke = typeof size === 'number' ? 12 : size === 'sm' ? 6 : size === 'md' ? 10 : 12;
+  const actualStroke = strokeWidth ?? defaultStroke;
+  const radius = (numericSize - actualStroke) / 2;
   const circumference = radius * 2 * Math.PI;
   const offset = circumference - (animatedScore / 100) * circumference;
 
@@ -34,26 +43,29 @@ export function GreenScoreRing({ score, size = 180, strokeWidth = 12 }: GreenSco
     return 'Starting';
   };
 
+  const fontSize = size === 'sm' ? 'text-lg' : size === 'lg' ? 'text-4xl' : 'text-2xl';
+  const labelSize = size === 'sm' ? 'text-xs' : 'text-sm';
+
   return (
     <div className="relative inline-flex items-center justify-center">
-      <svg width={size} height={size} className="transform -rotate-90">
+      <svg width={numericSize} height={numericSize} className="transform -rotate-90">
         {/* Background circle */}
         <circle
-          cx={size / 2}
-          cy={size / 2}
+          cx={numericSize / 2}
+          cy={numericSize / 2}
           r={radius}
           fill="none"
           stroke="hsl(var(--muted))"
-          strokeWidth={strokeWidth}
+          strokeWidth={actualStroke}
         />
         {/* Progress circle */}
         <circle
-          cx={size / 2}
-          cy={size / 2}
+          cx={numericSize / 2}
+          cy={numericSize / 2}
           r={radius}
           fill="none"
           stroke={getScoreColor()}
-          strokeWidth={strokeWidth}
+          strokeWidth={actualStroke}
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
@@ -64,12 +76,14 @@ export function GreenScoreRing({ score, size = 180, strokeWidth = 12 }: GreenSco
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-display text-4xl font-bold text-foreground">
+        <span className={`font-display font-bold text-foreground ${fontSize}`}>
           {animatedScore}
         </span>
-        <span className="text-sm font-medium text-muted-foreground mt-1">
-          {getScoreLabel()}
-        </span>
+        {size !== 'sm' && (
+          <span className={`font-medium text-muted-foreground mt-0.5 ${labelSize}`}>
+            {getScoreLabel()}
+          </span>
+        )}
       </div>
     </div>
   );
