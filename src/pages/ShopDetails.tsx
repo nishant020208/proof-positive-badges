@@ -322,7 +322,8 @@ export default function ShopDetails() {
                         
                         <BadgeProgressBar 
                           percentage={Number(badge.percentage)} 
-                          isEligible={badge.is_eligible} 
+                          isEligible={badge.is_eligible ?? false}
+                          level={badge.level ?? 'none'}
                         />
                       </div>
                       

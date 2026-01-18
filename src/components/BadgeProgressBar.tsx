@@ -2,17 +2,24 @@ import { Badge, getNextLevelThreshold } from '@/lib/badges';
 import { cn } from '@/lib/utils';
 
 interface BadgeProgressBarProps {
-  badge: Badge;
+  badge?: Badge;
+  percentage?: number;
+  isEligible?: boolean;
+  level?: string;
   showThresholds?: boolean;
 }
 
-export function BadgeProgressBar({ badge, showThresholds = true }: BadgeProgressBarProps) {
-  const nextLevel = getNextLevelThreshold(badge.percentage);
+export function BadgeProgressBar({ badge, percentage: propPercentage, isEligible: propIsEligible, level: propLevel, showThresholds = true }: BadgeProgressBarProps) {
+  const percentage = badge?.percentage ?? propPercentage ?? 0;
+  const isEligible = badge?.isEligible ?? propIsEligible ?? false;
+  const level = badge?.level ?? propLevel ?? 'none';
+  
+  const nextLevel = getNextLevelThreshold(percentage);
 
   const getProgressColor = () => {
-    if (badge.level === 'gold') return 'gold-gradient';
-    if (badge.level === 'silver') return 'silver-gradient';
-    if (badge.level === 'bronze') return 'bronze-gradient';
+    if (level === 'gold') return 'gold-gradient';
+    if (level === 'silver') return 'silver-gradient';
+    if (level === 'bronze') return 'bronze-gradient';
     return 'bg-muted-foreground/30';
   };
 
@@ -44,7 +51,7 @@ export function BadgeProgressBar({ badge, showThresholds = true }: BadgeProgress
             'absolute top-0 left-0 h-full rounded-full progress-fill',
             getProgressColor()
           )}
-          style={{ width: `${Math.min(badge.percentage, 100)}%` }}
+          style={{ width: `${Math.min(percentage, 100)}%` }}
         />
       </div>
 
@@ -60,7 +67,7 @@ export function BadgeProgressBar({ badge, showThresholds = true }: BadgeProgress
       )}
 
       {/* Next level hint */}
-      {nextLevel && badge.isEligible && (
+      {nextLevel && isEligible && (
         <p className="text-xs text-muted-foreground">
           {nextLevel.threshold - badge.percentage}% more to reach{' '}
           <span className={cn(
