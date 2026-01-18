@@ -40,35 +40,50 @@ export type Database = {
       }
       profiles: {
         Row: {
+          accepted_reports: number | null
           avatar_url: string | null
           created_at: string
+          credibility_score: number | null
           email: string
           full_name: string | null
           id: string
+          last_active_date: string | null
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
+          streak_days: number | null
+          total_reports: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          accepted_reports?: number | null
           avatar_url?: string | null
           created_at?: string
+          credibility_score?: number | null
           email: string
           full_name?: string | null
           id?: string
+          last_active_date?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          streak_days?: number | null
+          total_reports?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          accepted_reports?: number | null
           avatar_url?: string | null
           created_at?: string
+          credibility_score?: number | null
           email?: string
           full_name?: string | null
           id?: string
+          last_active_date?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          streak_days?: number | null
+          total_reports?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -187,6 +202,80 @@ export type Database = {
           {
             foreignKeyName: "shops_owner_id_fkey"
             columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_badge_definitions: {
+        Row: {
+          category: string
+          description: string
+          icon: string
+          id: string
+          name: string
+          requirement_type: string
+          requirement_value: number
+        }
+        Insert: {
+          category: string
+          description: string
+          icon: string
+          id: string
+          name: string
+          requirement_type: string
+          requirement_value: number
+        }
+        Update: {
+          category?: string
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          requirement_type?: string
+          requirement_value?: number
+        }
+        Relationships: []
+      }
+      user_badges: {
+        Row: {
+          badge_id: string
+          created_at: string
+          id: string
+          is_eligible: boolean | null
+          level: string | null
+          percentage: number | null
+          progress_data: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          badge_id: string
+          created_at?: string
+          id?: string
+          is_eligible?: boolean | null
+          level?: string | null
+          percentage?: number | null
+          progress_data?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          badge_id?: string
+          created_at?: string
+          id?: string
+          is_eligible?: boolean | null
+          level?: string | null
+          percentage?: number | null
+          progress_data?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_badges_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

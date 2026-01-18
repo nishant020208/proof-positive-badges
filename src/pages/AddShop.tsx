@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Leaf, ArrowLeft, MapPin, Upload, Store, FileText, CreditCard, Image } from 'lucide-react';
+import { Leaf, ArrowLeft, MapPin, Upload, Store, FileText, CreditCard, Image, CheckCircle } from 'lucide-react';
+import LocationMapPreview from '@/components/LocationMapPreview';
 import { z } from 'zod';
 
 const shopSchema = z.object({
@@ -131,13 +132,9 @@ export default function AddShop() {
         return false;
       }
       
-      if (!certificate) {
-        setErrors({ certificate: 'Please upload your business certificate' });
-        return false;
-      }
-      
-      if (!license) {
-        setErrors({ license: 'Please upload your trade license' });
+      // Either certificate or license is required
+      if (!certificate && !license) {
+        setErrors({ certificate: 'Please upload at least a certificate or license' });
         return false;
       }
       
@@ -169,8 +166,8 @@ export default function AddShop() {
       const certificateUrl = certificate ? await uploadFile(certificate, 'certificates') : null;
       const licenseUrl = license ? await uploadFile(license, 'licenses') : null;
 
-      if (!shopImageUrl || !certificateUrl || !licenseUrl) {
-        toast.error('Failed to upload one or more files. Please try again.');
+      if (!shopImageUrl) {
+        toast.error('Failed to upload shop image. Please try again.');
         setIsSubmitting(false);
         return;
       }
@@ -287,28 +284,58 @@ export default function AddShop() {
               {/* Location */}
               <div>
                 <Label>Shop Location *</Label>
-                <div className="mt-2">
+                <div className="mt-2 space-y-3">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant={latitude && longitude ? 'default' : 'outline'}
                     onClick={getCurrentLocation}
                     disabled={gettingLocation}
                     className="w-full"
                   >
                     {gettingLocation ? (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
+                    ) : latitude && longitude ? (
+                      <CheckCircle className="h-4 w-4 mr-2" />
                     ) : (
                       <MapPin className="h-4 w-4 mr-2" />
                     )}
                     {latitude && longitude ? 'Location Captured ✓' : 'Pin My Location'}
                   </Button>
-                  {latitude && longitude && (
-                    <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Lat: {latitude.toFixed(6)}, Lng: {longitude.toFixed(6)}
-                    </p>
-                  )}
+                  
+                  {/* Map Preview */}
+                  <LocationMapPreview 
+                    latitude={latitude} 
+                    longitude={longitude}
+                    shopName={name || 'Your Shop'}
+                  />
+                  
                   {errors.location && <p className="text-sm text-destructive mt-1">{errors.location}</p>}
                 </div>
+              </div>
+
+              {/* Verification Info */}
+              <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
+                <h4 className="font-semibold text-sm flex items-center gap-2 mb-2">
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                  Auto-Verification
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Your shop will be <strong>automatically verified</strong> once you provide:
+                </p>
+                <ul className="text-xs text-muted-foreground mt-2 space-y-1">
+                  <li className="flex items-center gap-2">
+                    {latitude && longitude ? <CheckCircle className="h-3 w-3 text-green-500" /> : <span className="h-3 w-3 rounded-full border border-muted-foreground" />}
+                    GPS Location
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {shopImage ? <CheckCircle className="h-3 w-3 text-green-500" /> : <span className="h-3 w-3 rounded-full border border-muted-foreground" />}
+                    Shop Image
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {certificate || license ? <CheckCircle className="h-3 w-3 text-green-500" /> : <span className="h-3 w-3 rounded-full border border-muted-foreground" />}
+                    Certificate or License
+                  </li>
+                </ul>
               </div>
 
               {/* Shop Image */}
