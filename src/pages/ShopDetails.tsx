@@ -2,15 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useShopBadges, useUserVotes, Shop, BadgeDefinition } from '@/hooks/useShops';
+import { useAIVerification } from '@/hooks/useAIVerification';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Leaf, ArrowLeft, MapPin, CheckCircle, ThumbsUp, ThumbsDown, Camera, Upload, Award } from 'lucide-react';
+import { Leaf, ArrowLeft, MapPin, CheckCircle, ThumbsUp, ThumbsDown, Camera, Upload, Award, Brain, LayoutDashboard } from 'lucide-react';
 import { GreenScoreRing } from '@/components/GreenScoreRing';
 import { BadgeLevelIndicator } from '@/components/BadgeLevelIndicator';
 import { BadgeProgressBar } from '@/components/BadgeProgressBar';
+import { AIVerificationPanel } from '@/components/AIVerificationPanel';
 
 const CATEGORY_INFO: Record<string, { name: string; icon: string; color: string }> = {
   plastic_packaging: { name: 'Plastic & Packaging', icon: '♻️', color: 'hsl(152, 45%, 28%)' },
@@ -25,15 +27,18 @@ export default function ShopDetails() {
   const { user, profile } = useAuth();
   const { badges, loading: badgesLoading } = useShopBadges(id || null);
   const { votes: userVotes, loading: votesLoading } = useUserVotes(profile?.id || null, id || null);
+  const { isVerifying, verificationResult, verifyProofImage, clearResult } = useAIVerification();
   
   const [shop, setShop] = useState<Shop | null>(null);
   const [loading, setLoading] = useState(true);
   const [votingBadge, setVotingBadge] = useState<string | null>(null);
+  const [votingBadgeName, setVotingBadgeName] = useState<string>('');
   const [voteType, setVoteType] = useState<'yes' | 'no' | null>(null);
   const [proofImage, setProofImage] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [aiVerified, setAiVerified] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -78,7 +83,7 @@ export default function ShopDetails() {
     getCurrentLocation();
   }, [getCurrentLocation]);
 
-  const handleVoteClick = (badgeId: string, type: 'yes' | 'no') => {
+  const handleVoteClick = (badgeId: string, badgeName: string, type: 'yes' | 'no') => {
     if (!user) {
       toast.error('Please login to vote');
       navigate('/auth');
@@ -91,12 +96,15 @@ export default function ShopDetails() {
     }
 
     setVotingBadge(badgeId);
+    setVotingBadgeName(badgeName);
     setVoteType(type);
     setProofImage(null);
     setProofPreview(null);
+    setAiVerified(false);
+    clearResult();
   };
 
-  const handleProofChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProofChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -107,6 +115,26 @@ export default function ShopDetails() {
 
     setProofImage(file);
     setProofPreview(URL.createObjectURL(file));
+    setAiVerified(false);
+
+    // Trigger AI verification
+    if (shop) {
+      const result = await verifyProofImage(
+        file,
+        votingBadgeName,
+        shop.name,
+        voteType === 'yes' ? 'Evidence supporting the eco-practice' : 'Evidence showing lack of eco-practice'
+      );
+
+      if (result) {
+        setAiVerified(true);
+        if (!result.isValid) {
+          toast.warning('AI detected issues with your proof image. You can still submit, but it may be reviewed.');
+        } else if (result.confidence >= 70) {
+          toast.success('AI verified your proof image!');
+        }
+      }
+    }
   };
 
   const submitVote = async () => {
@@ -138,7 +166,15 @@ export default function ShopDetails() {
         .from('proof-images')
         .getPublicUrl(fileName);
 
-      // Submit vote
+      // Get AI verification data
+      const proofResult = verificationResult as {
+        isValid?: boolean;
+        confidence?: number;
+        supports?: string;
+        reason?: string;
+      } | null;
+
+      // Submit vote with AI verification data
       const { error: voteError } = await supabase.from('votes').insert({
         user_id: profile.id,
         shop_id: id,
@@ -147,6 +183,12 @@ export default function ShopDetails() {
         proof_image_url: urlData.publicUrl,
         latitude: userLocation?.lat || null,
         longitude: userLocation?.lng || null,
+        ai_verified: proofResult?.isValid ?? false,
+        ai_confidence_score: proofResult?.confidence ?? 0,
+        ai_verification_result: proofResult ? JSON.stringify({
+          supports: proofResult.supports,
+          reason: proofResult.reason,
+        }) : null,
       });
 
       if (voteError) {
@@ -171,6 +213,7 @@ export default function ShopDetails() {
       setIsSubmitting(false);
       setVotingBadge(null);
       setVoteType(null);
+      clearResult();
     }
   };
 
@@ -195,26 +238,38 @@ export default function ShopDetails() {
 
   const earnedBadges = badges.filter(b => b.level !== 'none' && b.is_eligible);
 
+  // Check if current user is the shop owner
+  const isOwner = profile?.id === shop.owner_id;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container flex items-center h-16">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2 ml-2">
-            <div className="p-2 rounded-xl eco-gradient">
-              <Leaf className="h-5 w-5 text-white" />
+        <div className="container flex items-center justify-between h-16">
+          <div className="flex items-center">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-2 ml-2">
+              <div className="p-2 rounded-xl eco-gradient">
+                <Leaf className="h-5 w-5 text-white" />
+              </div>
+              <span className="font-display text-xl font-bold text-foreground truncate">{shop.name}</span>
             </div>
-            <span className="font-display text-xl font-bold text-foreground truncate">{shop.name}</span>
           </div>
+          
+          {isOwner && (
+            <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}>
+              <LayoutDashboard className="h-4 w-4 mr-1" />
+              Dashboard
+            </Button>
+          )}
         </div>
       </header>
 
       <main className="container py-6 space-y-6">
         {/* Shop Header */}
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden glass-card">
           {shop.shop_image_url && (
             <div className="h-48 overflow-hidden">
               <img
@@ -276,7 +331,7 @@ export default function ShopDetails() {
 
         {/* Badge Categories */}
         {Object.entries(groupedBadges).map(([category, categoryBadges]) => (
-          <Card key={category}>
+          <Card key={category} className="glass-card">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2">
                 <span>{CATEGORY_INFO[category]?.icon || '🏷️'}</span>
@@ -290,7 +345,7 @@ export default function ShopDetails() {
                 return (
                   <div
                     key={badge.badge_id}
-                    className="p-4 rounded-xl border border-border bg-card/50"
+                    className="p-4 rounded-xl border border-border bg-card/50 hover:bg-card/80 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
@@ -332,8 +387,8 @@ export default function ShopDetails() {
                         <Button
                           size="sm"
                           variant={hasVoted && userVotes[badge.badge_id] === 'yes' ? 'default' : 'outline'}
-                          className={hasVoted && userVotes[badge.badge_id] === 'yes' ? 'bg-green-600' : ''}
-                          onClick={() => handleVoteClick(badge.badge_id, 'yes')}
+                          className={hasVoted && userVotes[badge.badge_id] === 'yes' ? 'bg-green-600 hover:bg-green-700' : ''}
+                          onClick={() => handleVoteClick(badge.badge_id, badge.badge.name, 'yes')}
                           disabled={hasVoted}
                         >
                           <ThumbsUp className="h-4 w-4" />
@@ -341,8 +396,8 @@ export default function ShopDetails() {
                         <Button
                           size="sm"
                           variant={hasVoted && userVotes[badge.badge_id] === 'no' ? 'default' : 'outline'}
-                          className={hasVoted && userVotes[badge.badge_id] === 'no' ? 'bg-red-600' : ''}
-                          onClick={() => handleVoteClick(badge.badge_id, 'no')}
+                          className={hasVoted && userVotes[badge.badge_id] === 'no' ? 'bg-red-600 hover:bg-red-700' : ''}
+                          onClick={() => handleVoteClick(badge.badge_id, badge.badge.name, 'no')}
                           disabled={hasVoted}
                         >
                           <ThumbsDown className="h-4 w-4" />
@@ -357,30 +412,32 @@ export default function ShopDetails() {
         ))}
       </main>
 
-      {/* Vote Dialog */}
-      <Dialog open={!!votingBadge} onOpenChange={() => setVotingBadge(null)}>
-        <DialogContent>
+      {/* Vote Dialog with AI Verification */}
+      <Dialog open={!!votingBadge} onOpenChange={() => { setVotingBadge(null); clearResult(); }}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-primary" />
               {voteType === 'yes' ? 'Confirm Verification' : 'Report Issue'}
             </DialogTitle>
             <DialogDescription>
-              Please upload a photo as proof to submit your vote
+              Upload a photo as proof. AI will instantly analyze your image.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Proof Upload */}
             <div>
-              <label className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+              <label className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
                 proofPreview ? 'border-primary' : 'border-border hover:border-primary/50'
-              }`}>
+              } ${isVerifying ? 'pointer-events-none opacity-50' : ''}`}>
                 {proofPreview ? (
                   <img src={proofPreview} alt="Proof" className="h-full w-full object-cover rounded-xl" />
                 ) : (
                   <div className="flex flex-col items-center">
                     <Camera className="h-10 w-10 text-muted-foreground mb-2" />
                     <span className="text-sm text-muted-foreground">Take or upload proof photo</span>
-                    <span className="text-xs text-muted-foreground mt-1">Geo-tagged & timestamped</span>
+                    <span className="text-xs text-muted-foreground mt-1">AI will verify instantly</span>
                   </div>
                 )}
                 <input
@@ -389,9 +446,17 @@ export default function ShopDetails() {
                   capture="environment"
                   className="hidden"
                   onChange={handleProofChange}
+                  disabled={isVerifying}
                 />
               </label>
             </div>
+
+            {/* AI Verification Panel */}
+            <AIVerificationPanel 
+              isVerifying={isVerifying}
+              result={verificationResult}
+              type="proof"
+            />
 
             {userLocation && (
               <p className="text-xs text-muted-foreground text-center">
@@ -402,7 +467,7 @@ export default function ShopDetails() {
             <Button
               className="w-full"
               onClick={submitVote}
-              disabled={!proofImage || isSubmitting}
+              disabled={!proofImage || isSubmitting || isVerifying}
             >
               {isSubmitting ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
@@ -413,6 +478,12 @@ export default function ShopDetails() {
                 </>
               )}
             </Button>
+
+            {aiVerified && verificationResult && (
+              <p className="text-xs text-center text-muted-foreground">
+                AI confidence: {verificationResult.confidence}%
+              </p>
+            )}
           </div>
         </DialogContent>
       </Dialog>
