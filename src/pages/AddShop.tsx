@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useAIVerification } from '@/hooks/useAIVerification';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,8 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Leaf, ArrowLeft, MapPin, Upload, Store, FileText, CreditCard, Image, CheckCircle } from 'lucide-react';
+import { Leaf, ArrowLeft, MapPin, Upload, Store, FileText, CreditCard, Image, CheckCircle, Brain, Sparkles } from 'lucide-react';
 import LocationMapPreview from '@/components/LocationMapPreview';
+import { AIVerificationPanel } from '@/components/AIVerificationPanel';
 import { z } from 'zod';
 
 const shopSchema = z.object({
@@ -22,6 +24,7 @@ const shopSchema = z.object({
 export default function AddShop() {
   const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
+  const { isVerifying, verificationResult, verifyShopImage, clearResult } = useAIVerification();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [name, setName] = useState('');
@@ -38,6 +41,7 @@ export default function AddShop() {
   const [shopImagePreview, setShopImagePreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [shopImageVerified, setShopImageVerified] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -75,7 +79,7 @@ export default function AddShop() {
     }
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'shop' | 'certificate' | 'license') => {
+  const handleShopImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -84,17 +88,39 @@ export default function AddShop() {
       return;
     }
 
-    switch (type) {
-      case 'shop':
-        setShopImage(file);
-        setShopImagePreview(URL.createObjectURL(file));
-        break;
-      case 'certificate':
-        setCertificate(file);
-        break;
-      case 'license':
-        setLicense(file);
-        break;
+    setShopImage(file);
+    setShopImagePreview(URL.createObjectURL(file));
+    setShopImageVerified(false);
+    clearResult();
+
+    // Trigger AI verification
+    const result = await verifyShopImage(file, name || 'Shop');
+    
+    if (result) {
+      setShopImageVerified(true);
+      if (!result.isValid) {
+        toast.warning('AI detected issues with your shop image. Please review and consider uploading a better image.');
+      } else if (result.confidence >= 70) {
+        toast.success('AI verified your shop image!');
+      } else {
+        toast.info('Shop image uploaded. AI verification complete.');
+      }
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'certificate' | 'license') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    if (type === 'certificate') {
+      setCertificate(file);
+    } else {
+      setLicense(file);
     }
   };
 
@@ -172,7 +198,14 @@ export default function AddShop() {
         return;
       }
 
-      // Create shop
+      // Get AI verification result
+      const aiResult = verificationResult as {
+        isValid?: boolean;
+        confidence?: number;
+        reason?: string;
+      } | null;
+
+      // Create shop with AI verification data
       const { error } = await supabase.from('shops').insert({
         owner_id: profile.id,
         name,
@@ -186,14 +219,20 @@ export default function AddShop() {
         gst_number: gstNumber || null,
         is_verified: false,
         verification_status: 'pending',
+        ai_verification_status: aiResult?.isValid ? 'verified' : 'pending',
+        ai_verification_result: aiResult ? JSON.stringify({
+          confidence: aiResult.confidence,
+          reason: aiResult.reason,
+        }) : null,
+        ai_verified_at: aiResult?.isValid ? new Date().toISOString() : null,
       });
 
       if (error) {
         toast.error('Failed to register shop. Please try again.');
         console.error(error);
       } else {
-        toast.success('Shop registered successfully! It will be verified soon.');
-        navigate('/');
+        toast.success('Shop registered successfully! AI verification complete.');
+        navigate('/dashboard');
       }
     } catch (err) {
       toast.error('An unexpected error occurred');
@@ -229,14 +268,15 @@ export default function AddShop() {
       </header>
 
       <main className="container py-6 max-w-2xl">
-        <Card>
+        <Card className="glass-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Store className="h-5 w-5 text-primary" />
               Register Your Shop
             </CardTitle>
-            <CardDescription>
-              Fill in your shop details and upload required documents for verification
+            <CardDescription className="flex items-center gap-2">
+              <Brain className="h-4 w-4 text-primary" />
+              AI-powered instant verification for faster approval
             </CardDescription>
           </CardHeader>
 
@@ -313,6 +353,47 @@ export default function AddShop() {
                 </div>
               </div>
 
+              {/* Shop Image with AI Verification */}
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2">
+                  Shop Image *
+                  <span className="inline-flex items-center gap-1 text-xs text-primary font-normal">
+                    <Sparkles className="h-3 w-3" />
+                    AI Verified
+                  </span>
+                </Label>
+                <div>
+                  <label className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
+                    errors.shopImage ? 'border-destructive' : shopImagePreview ? 'border-primary' : 'border-border hover:border-primary/50'
+                  } ${isVerifying ? 'pointer-events-none opacity-50' : ''}`}>
+                    {shopImagePreview ? (
+                      <img src={shopImagePreview} alt="Preview" className="h-full w-full object-cover rounded-xl" />
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <Image className="h-8 w-8 text-muted-foreground mb-2" />
+                        <span className="text-sm text-muted-foreground">Upload shop photo</span>
+                        <span className="text-xs text-muted-foreground mt-1">AI will verify instantly</span>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleShopImageChange}
+                      disabled={isVerifying}
+                    />
+                  </label>
+                  {errors.shopImage && <p className="text-sm text-destructive mt-1">{errors.shopImage}</p>}
+                </div>
+
+                {/* AI Verification Panel for Shop Image */}
+                <AIVerificationPanel 
+                  isVerifying={isVerifying}
+                  result={verificationResult}
+                  type="shop"
+                />
+              </div>
+
               {/* Verification Info */}
               <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
                 <h4 className="font-semibold text-sm flex items-center gap-2 mb-2">
@@ -328,40 +409,14 @@ export default function AddShop() {
                     GPS Location
                   </li>
                   <li className="flex items-center gap-2">
-                    {shopImage ? <CheckCircle className="h-3 w-3 text-green-500" /> : <span className="h-3 w-3 rounded-full border border-muted-foreground" />}
-                    Shop Image
+                    {shopImageVerified ? <CheckCircle className="h-3 w-3 text-green-500" /> : <span className="h-3 w-3 rounded-full border border-muted-foreground" />}
+                    AI-Verified Shop Image
                   </li>
                   <li className="flex items-center gap-2">
                     {certificate || license ? <CheckCircle className="h-3 w-3 text-green-500" /> : <span className="h-3 w-3 rounded-full border border-muted-foreground" />}
                     Certificate or License
                   </li>
                 </ul>
-              </div>
-
-              {/* Shop Image */}
-              <div>
-                <Label>Shop Image *</Label>
-                <div className="mt-2">
-                  <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
-                    errors.shopImage ? 'border-destructive' : 'border-border hover:border-primary/50'
-                  }`}>
-                    {shopImagePreview ? (
-                      <img src={shopImagePreview} alt="Preview" className="h-full w-full object-cover rounded-xl" />
-                    ) : (
-                      <div className="flex flex-col items-center">
-                        <Image className="h-8 w-8 text-muted-foreground mb-2" />
-                        <span className="text-sm text-muted-foreground">Upload shop photo</span>
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handleFileChange(e, 'shop')}
-                    />
-                  </label>
-                  {errors.shopImage && <p className="text-sm text-destructive mt-1">{errors.shopImage}</p>}
-                </div>
               </div>
 
               {/* Certificate */}
@@ -424,7 +479,7 @@ export default function AddShop() {
               </div>
 
               {/* Submit */}
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
+              <Button type="submit" className="w-full" disabled={isSubmitting || isVerifying}>
                 {isSubmitting ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
                 ) : (
@@ -433,7 +488,7 @@ export default function AddShop() {
               </Button>
 
               <p className="text-xs text-muted-foreground text-center">
-                Your shop will be reviewed and verified within 24-48 hours
+                AI verification provides instant feedback. Final verification within 24 hours.
               </p>
             </form>
           </CardContent>
