@@ -39,63 +39,66 @@ body > div:last-of-type:not(#root):not(.sonner-toaster) {
 
 @layer base {
   :root {
-    /* Core palette - eco-inspired */
+    /* Core palette - eco-inspired with premium feel */
     --background: 42 30% 97%;
-    --foreground: 150 25% 15%;
+    --foreground: 150 25% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 150 25% 15%;
+    --card-foreground: 150 25% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 150 25% 15%;
+    --popover-foreground: 150 25% 12%;
 
     /* Deep forest green primary */
-    --primary: 152 45% 28%;
-    --primary-foreground: 42 30% 97%;
+    --primary: 152 55% 32%;
+    --primary-foreground: 42 30% 98%;
 
     /* Earth/terracotta secondary */
     --secondary: 28 45% 92%;
     --secondary-foreground: 28 55% 30%;
 
     --muted: 42 20% 92%;
-    --muted-foreground: 150 10% 45%;
+    --muted-foreground: 150 12% 45%;
 
-    /* Leaf green accent */
-    --accent: 142 55% 45%;
+    /* Vibrant leaf green accent */
+    --accent: 142 60% 42%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 150 15% 85%;
-    --input: 150 15% 85%;
-    --ring: 152 45% 28%;
+    --border: 150 12% 88%;
+    --input: 150 12% 88%;
+    --ring: 152 55% 32%;
 
-    --radius: 0.75rem;
+    --radius: 0.875rem;
 
-    /* Badge level colors */
-    --badge-bronze: 30 60% 50%;
-    --badge-silver: 0 0% 75%;
+    /* Badge level colors - vibrant */
+    --badge-bronze: 30 70% 48%;
+    --badge-silver: 220 8% 72%;
     --badge-gold: 45 100% 50%;
-    --badge-none: 150 10% 70%;
+    --badge-none: 150 8% 75%;
 
     /* Success/verification colors */
-    --success: 142 70% 45%;
+    --success: 142 75% 42%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
+    --warning: 38 95% 50%;
     --warning-foreground: 0 0% 100%;
 
-    /* Gradients */
-    --gradient-eco: linear-gradient(135deg, hsl(152 45% 28%) 0%, hsl(142 55% 45%) 100%);
-    --gradient-gold: linear-gradient(135deg, hsl(45 100% 50%) 0%, hsl(38 90% 55%) 100%);
-    --gradient-silver: linear-gradient(135deg, hsl(0 0% 85%) 0%, hsl(0 0% 70%) 100%);
-    --gradient-bronze: linear-gradient(135deg, hsl(30 60% 55%) 0%, hsl(25 50% 45%) 100%);
+    /* Premium gradients */
+    --gradient-eco: linear-gradient(135deg, hsl(152 55% 32%) 0%, hsl(142 60% 42%) 50%, hsl(158 50% 45%) 100%);
+    --gradient-gold: linear-gradient(135deg, hsl(45 100% 50%) 0%, hsl(38 95% 55%) 50%, hsl(42 100% 48%) 100%);
+    --gradient-silver: linear-gradient(135deg, hsl(220 8% 82%) 0%, hsl(220 8% 72%) 50%, hsl(220 8% 78%) 100%);
+    --gradient-bronze: linear-gradient(135deg, hsl(30 70% 52%) 0%, hsl(25 60% 45%) 50%, hsl(28 65% 48%) 100%);
+    --gradient-premium: linear-gradient(135deg, hsl(280 70% 45%) 0%, hsl(320 70% 50%) 50%, hsl(350 75% 55%) 100%);
 
-    /* Shadows */
-    --shadow-card: 0 4px 20px -4px hsla(150, 25%, 15%, 0.08);
-    --shadow-badge: 0 2px 12px -2px hsla(150, 25%, 15%, 0.15);
-    --shadow-glow-gold: 0 0 20px hsla(45, 100%, 50%, 0.4);
-    --shadow-glow-eco: 0 0 20px hsla(142, 55%, 45%, 0.3);
+    /* Shadows - more dramatic */
+    --shadow-card: 0 4px 24px -6px hsla(150, 25%, 12%, 0.08), 0 2px 8px -2px hsla(150, 25%, 12%, 0.04);
+    --shadow-badge: 0 4px 16px -4px hsla(150, 25%, 12%, 0.15), 0 2px 6px -2px hsla(150, 25%, 12%, 0.08);
+    --shadow-glow-gold: 0 0 30px hsla(45, 100%, 50%, 0.4), 0 0 60px hsla(45, 100%, 50%, 0.2);
+    --shadow-glow-eco: 0 0 30px hsla(142, 60%, 42%, 0.35), 0 0 60px hsla(142, 60%, 42%, 0.15);
+    --shadow-glow-premium: 0 0 40px hsla(280, 70%, 50%, 0.3);
+    --shadow-elevated: 0 20px 40px -12px hsla(150, 25%, 12%, 0.15);
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -108,33 +111,33 @@ body > div:last-of-type:not(#root):not(.sonner-toaster) {
   }
 
   .dark {
-    --background: 150 25% 8%;
+    --background: 150 20% 6%;
     --foreground: 42 30% 95%;
 
-    --card: 150 20% 12%;
+    --card: 150 18% 10%;
     --card-foreground: 42 30% 95%;
 
-    --popover: 150 20% 12%;
+    --popover: 150 18% 10%;
     --popover-foreground: 42 30% 95%;
 
-    --primary: 142 55% 45%;
-    --primary-foreground: 150 25% 8%;
+    --primary: 142 60% 48%;
+    --primary-foreground: 150 20% 6%;
 
-    --secondary: 150 15% 18%;
+    --secondary: 150 12% 16%;
     --secondary-foreground: 42 30% 90%;
 
-    --muted: 150 15% 18%;
-    --muted-foreground: 150 10% 60%;
+    --muted: 150 12% 16%;
+    --muted-foreground: 150 8% 58%;
 
-    --accent: 152 45% 35%;
+    --accent: 152 50% 38%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 150 15% 20%;
-    --input: 150 15% 20%;
-    --ring: 142 55% 45%;
+    --border: 150 12% 18%;
+    --input: 150 12% 18%;
+    --ring: 142 60% 48%;
 
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
@@ -163,6 +166,44 @@ body > div:last-of-type:not(#root):not(.sonner-toaster) {
 }
 
 @layer components {
+  /* Glass morphism effect */
+  .glass-morphism {
+    @apply bg-card/80 backdrop-blur-xl border-b border-border/50;
+    box-shadow: 0 1px 3px hsla(150, 25%, 12%, 0.05);
+  }
+
+  /* Card with glass effect */
+  .card-glass {
+    @apply bg-card/95 backdrop-blur-sm border border-border/60 rounded-2xl;
+    box-shadow: var(--shadow-card);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .card-glass:hover {
+    box-shadow: var(--shadow-elevated);
+    transform: translateY(-2px);
+  }
+
+  /* Stat card */
+  .stat-card {
+    @apply p-4 rounded-xl bg-gradient-to-br from-card to-muted/30 border border-border/50;
+    transition: all 0.2s ease;
+  }
+
+  .stat-card:hover {
+    @apply border-primary/30;
+    transform: scale(1.02);
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    background: var(--gradient-eco);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Badge shine animation */
   .badge-shine {
     position: relative;
     overflow: hidden;
@@ -177,9 +218,9 @@ body > div:last-of-type:not(#root):not(.sonner-toaster) {
     height: 200%;
     background: linear-gradient(
       45deg,
-      transparent 30%,
-      rgba(255, 255, 255, 0.3) 50%,
-      transparent 70%
+      transparent 25%,
+      rgba(255, 255, 255, 0.4) 50%,
+      transparent 75%
     );
     transform: translateX(-100%) rotate(45deg);
     animation: shine 3s infinite;
@@ -194,10 +235,12 @@ body > div:last-of-type:not(#root):not(.sonner-toaster) {
     }
   }
 
+  /* Progress bar with smooth fill */
   .progress-fill {
-    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  /* Animated score ring */
   .score-ring {
     stroke-dasharray: 283;
     stroke-dashoffset: 283;
@@ -210,15 +253,17 @@ body > div:last-of-type:not(#root):not(.sonner-toaster) {
     }
   }
 
+  /* Card hover effect */
   .card-hover {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .card-hover:hover {
     transform: translateY(-4px);
-    box-shadow: var(--shadow-badge);
+    box-shadow: var(--shadow-elevated);
   }
 
+  /* Gradient backgrounds */
   .eco-gradient {
     background: var(--gradient-eco);
   }
@@ -234,10 +279,156 @@ body > div:last-of-type:not(#root):not(.sonner-toaster) {
   .bronze-gradient {
     background: var(--gradient-bronze);
   }
+
+  .premium-gradient {
+    background: var(--gradient-premium);
+  }
+
+  /* Pulse animation for AI badges */
+  @keyframes pulse-soft {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+
+  .animate-pulse-soft {
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+
+  /* Slide up animation */
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.5s ease-out forwards;
+    opacity: 0;
+  }
+
+  /* Glow effects */
+  .glow-eco {
+    box-shadow: var(--shadow-glow-eco);
+  }
+
+  .glow-gold {
+    box-shadow: var(--shadow-glow-gold);
+  }
+
+  .glow-premium {
+    box-shadow: var(--shadow-glow-premium);
+  }
+
+  /* Button with icon animation */
+  .btn-icon-animate {
+    transition: all 0.2s ease;
+  }
+
+  .btn-icon-animate:hover svg {
+    transform: scale(1.1);
+    transition: transform 0.2s ease;
+  }
+
+  /* Badge level indicators */
+  .badge-level-gold {
+    @apply bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-500 text-white;
+    box-shadow: 0 2px 12px hsla(45, 100%, 50%, 0.35);
+  }
+
+  .badge-level-silver {
+    @apply bg-gradient-to-r from-gray-300 via-gray-400 to-gray-500 text-white;
+    box-shadow: 0 2px 12px hsla(220, 8%, 50%, 0.3);
+  }
+
+  .badge-level-bronze {
+    @apply bg-gradient-to-r from-amber-600 via-amber-700 to-orange-700 text-white;
+    box-shadow: 0 2px 12px hsla(30, 70%, 40%, 0.3);
+  }
+
+  /* Premium card border animation */
+  @keyframes border-glow {
+    0%, 100% {
+      border-color: hsla(152, 55%, 32%, 0.3);
+    }
+    50% {
+      border-color: hsla(142, 60%, 42%, 0.6);
+    }
+  }
+
+  .border-glow-animate {
+    animation: border-glow 3s ease-in-out infinite;
+  }
+
+  /* Score display */
+  .score-display {
+    @apply relative font-display font-bold;
+    text-shadow: 0 2px 4px hsla(150, 25%, 12%, 0.1);
+  }
+
+  /* Interactive elements */
+  .interactive-element {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .interactive-element:hover {
+    @apply scale-[1.02];
+  }
+
+  .interactive-element:active {
+    @apply scale-[0.98];
+  }
+
+  /* Verified badge glow */
+  .verified-glow {
+    position: relative;
+  }
+
+  .verified-glow::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    background: var(--gradient-eco);
+    border-radius: inherit;
+    opacity: 0.3;
+    filter: blur(8px);
+    z-index: -1;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* Fade in animation */
+  .fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Scale on hover */
+  .scale-hover {
+    transition: transform 0.2s ease;
+  }
+
+  .scale-hover:hover {
+    transform: scale(1.05);
   }
 }
