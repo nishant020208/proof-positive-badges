@@ -143,9 +143,54 @@ export type Database = {
           },
         ]
       }
+      shop_responses: {
+        Row: {
+          created_at: string
+          id: string
+          response_text: string
+          shop_id: string
+          updated_at: string
+          vote_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          response_text: string
+          shop_id: string
+          updated_at?: string
+          vote_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          response_text?: string
+          shop_id?: string
+          updated_at?: string
+          vote_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_responses_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_responses_vote_id_fkey"
+            columns: ["vote_id"]
+            isOneToOne: false
+            referencedRelation: "votes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shops: {
         Row: {
           address: string
+          ai_verification_result: string | null
+          ai_verification_status: string | null
+          ai_verified_at: string | null
           certificate_url: string | null
           created_at: string
           description: string | null
@@ -164,6 +209,9 @@ export type Database = {
         }
         Insert: {
           address: string
+          ai_verification_result?: string | null
+          ai_verification_status?: string | null
+          ai_verified_at?: string | null
           certificate_url?: string | null
           created_at?: string
           description?: string | null
@@ -182,6 +230,9 @@ export type Database = {
         }
         Update: {
           address?: string
+          ai_verification_result?: string | null
+          ai_verification_status?: string | null
+          ai_verified_at?: string | null
           certificate_url?: string | null
           created_at?: string
           description?: string | null
@@ -284,6 +335,9 @@ export type Database = {
       }
       votes: {
         Row: {
+          ai_confidence_score: number | null
+          ai_verification_result: string | null
+          ai_verified: boolean | null
           badge_id: string
           created_at: string
           id: string
@@ -295,6 +349,9 @@ export type Database = {
           vote_type: string
         }
         Insert: {
+          ai_confidence_score?: number | null
+          ai_verification_result?: string | null
+          ai_verified?: boolean | null
           badge_id: string
           created_at?: string
           id?: string
@@ -306,6 +363,9 @@ export type Database = {
           vote_type: string
         }
         Update: {
+          ai_confidence_score?: number | null
+          ai_verification_result?: string | null
+          ai_verified?: boolean | null
           badge_id?: string
           created_at?: string
           id?: string
