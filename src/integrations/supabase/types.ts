@@ -38,6 +38,33 @@ export type Database = {
         }
         Relationships: []
       }
+      owner_whitelist: {
+        Row: {
+          activated_at: string | null
+          added_by: string
+          created_at: string
+          email: string
+          id: string
+          status: string
+        }
+        Insert: {
+          activated_at?: string | null
+          added_by: string
+          created_at?: string
+          email: string
+          id?: string
+          status?: string
+        }
+        Update: {
+          activated_at?: string | null
+          added_by?: string
+          created_at?: string
+          email?: string
+          id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           accepted_reports: number | null
@@ -143,6 +170,65 @@ export type Database = {
           },
         ]
       }
+      shop_products: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          discount_percentage: number | null
+          discounted_price: number | null
+          eco_tags: string[] | null
+          id: string
+          image_url: string | null
+          is_available: boolean | null
+          is_eco_friendly: boolean | null
+          name: string
+          price: number
+          shop_id: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          discount_percentage?: number | null
+          discounted_price?: number | null
+          eco_tags?: string[] | null
+          id?: string
+          image_url?: string | null
+          is_available?: boolean | null
+          is_eco_friendly?: boolean | null
+          name: string
+          price: number
+          shop_id: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          discount_percentage?: number | null
+          discounted_price?: number | null
+          eco_tags?: string[] | null
+          id?: string
+          image_url?: string | null
+          is_available?: boolean | null
+          is_eco_friendly?: boolean | null
+          name?: string
+          price?: number
+          shop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_products_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shop_responses: {
         Row: {
           created_at: string
@@ -192,6 +278,8 @@ export type Database = {
           ai_verification_status: string | null
           ai_verified_at: string | null
           certificate_url: string | null
+          contact_email: string | null
+          contact_phone: string | null
           created_at: string
           description: string | null
           green_score: number | null
@@ -202,8 +290,14 @@ export type Database = {
           license_url: string | null
           longitude: number
           name: string
+          opening_hours: Json | null
           owner_id: string
+          owner_verified: boolean | null
+          owner_verified_at: string | null
+          owner_verified_by: string | null
           shop_image_url: string | null
+          social_links: Json | null
+          tagline: string | null
           updated_at: string
           verification_status: string | null
         }
@@ -213,6 +307,8 @@ export type Database = {
           ai_verification_status?: string | null
           ai_verified_at?: string | null
           certificate_url?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           description?: string | null
           green_score?: number | null
@@ -223,8 +319,14 @@ export type Database = {
           license_url?: string | null
           longitude: number
           name: string
+          opening_hours?: Json | null
           owner_id: string
+          owner_verified?: boolean | null
+          owner_verified_at?: string | null
+          owner_verified_by?: string | null
           shop_image_url?: string | null
+          social_links?: Json | null
+          tagline?: string | null
           updated_at?: string
           verification_status?: string | null
         }
@@ -234,6 +336,8 @@ export type Database = {
           ai_verification_status?: string | null
           ai_verified_at?: string | null
           certificate_url?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           description?: string | null
           green_score?: number | null
@@ -244,8 +348,14 @@ export type Database = {
           license_url?: string | null
           longitude?: number
           name?: string
+          opening_hours?: Json | null
           owner_id?: string
+          owner_verified?: boolean | null
+          owner_verified_at?: string | null
+          owner_verified_by?: string | null
           shop_image_url?: string | null
+          social_links?: Json | null
+          tagline?: string | null
           updated_at?: string
           verification_status?: string | null
         }
@@ -333,6 +443,30 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       votes: {
         Row: {
           ai_confidence_score: number | null
@@ -343,6 +477,10 @@ export type Database = {
           id: string
           latitude: number | null
           longitude: number | null
+          owner_approved: boolean | null
+          owner_approved_at: string | null
+          owner_approved_by: string | null
+          owner_rejection_reason: string | null
           proof_image_url: string | null
           shop_id: string
           user_id: string
@@ -357,6 +495,10 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          owner_approved?: boolean | null
+          owner_approved_at?: string | null
+          owner_approved_by?: string | null
+          owner_rejection_reason?: string | null
           proof_image_url?: string | null
           shop_id: string
           user_id: string
@@ -371,6 +513,10 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          owner_approved?: boolean | null
+          owner_approved_at?: string | null
+          owner_approved_by?: string | null
+          owner_rejection_reason?: string | null
           proof_image_url?: string | null
           shop_id?: string
           user_id?: string
@@ -405,9 +551,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_owner: { Args: never; Returns: boolean }
     }
     Enums: {
+      app_role: "customer" | "shop_owner" | "owner"
       user_role: "customer" | "shop_owner"
     }
     CompositeTypes: {
@@ -536,6 +690,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["customer", "shop_owner", "owner"],
       user_role: ["customer", "shop_owner"],
     },
   },
