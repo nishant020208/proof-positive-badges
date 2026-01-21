@@ -12,6 +12,8 @@ import Leaderboard from "./pages/Leaderboard";
 import MapView from "./pages/MapView";
 import CustomerProfile from "./pages/CustomerProfile";
 import ShopOwnerDashboard from "./pages/ShopOwnerDashboard";
+import OwnerDashboard from "./pages/OwnerDashboard";
+import ShopProfileManage from "./pages/ShopProfileManage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +34,8 @@ const App = () => (
             <Route path="/map" element={<MapView />} />
             <Route path="/profile" element={<CustomerProfile />} />
             <Route path="/dashboard" element={<ShopOwnerDashboard />} />
+            <Route path="/owner-dashboard" element={<OwnerDashboard />} />
+            <Route path="/shop-profile" element={<ShopProfileManage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
