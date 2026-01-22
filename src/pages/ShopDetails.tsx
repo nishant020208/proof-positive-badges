@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useShopBadges, useUserVotes, Shop, BadgeDefinition } from '@/hooks/useShops';
+import { useShopBadges, useUserVotes, Shop } from '@/hooks/useShops';
 import { useAIVerification } from '@/hooks/useAIVerification';
 import { supabase } from '@/integrations/supabase/client';
+import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Leaf, ArrowLeft, MapPin, CheckCircle, ThumbsUp, ThumbsDown, Camera, Upload, Award, Brain, LayoutDashboard } from 'lucide-react';
+import { MapPin, CheckCircle, ThumbsUp, ThumbsDown, Camera, Award, Brain, AlertCircle, Upload } from 'lucide-react';
 import { GreenScoreRing } from '@/components/GreenScoreRing';
 import { BadgeLevelIndicator } from '@/components/BadgeLevelIndicator';
 import { BadgeProgressBar } from '@/components/BadgeProgressBar';
@@ -242,30 +243,8 @@ export default function ShopDetails() {
   const isOwner = profile?.id === shop.owner_id;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container flex items-center justify-between h-16">
-          <div className="flex items-center">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center gap-2 ml-2">
-              <div className="p-2 rounded-xl eco-gradient">
-                <Leaf className="h-5 w-5 text-white" />
-              </div>
-              <span className="font-display text-xl font-bold text-foreground truncate">{shop.name}</span>
-            </div>
-          </div>
-          
-          {isOwner && (
-            <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}>
-              <LayoutDashboard className="h-4 w-4 mr-1" />
-              Dashboard
-            </Button>
-          )}
-        </div>
-      </header>
+    <div className="min-h-screen bg-gradient-to-b from-background to-accent/10">
+      <AppHeader />
 
       <main className="container py-6 space-y-6">
         {/* Shop Header */}

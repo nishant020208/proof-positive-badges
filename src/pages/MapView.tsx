@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useShops, Shop } from '@/hooks/useShops';
-import { Button } from '@/components/ui/button';
+import { AppHeader } from '@/components/AppHeader';
 import { Card, CardContent } from '@/components/ui/card';
-import { Leaf, ArrowLeft, MapPin, Navigation, Star } from 'lucide-react';
+import { MapPin, Navigation, Leaf } from 'lucide-react';
 
 function getScoreColor(score: number) {
-  if (score >= 85) return '#22c55e'; // green
-  if (score >= 50) return '#eab308'; // yellow
-  return '#ef4444'; // red
+  if (score >= 85) return 'hsl(var(--primary))';
+  if (score >= 50) return 'hsl(45, 90%, 50%)';
+  return 'hsl(0, 80%, 55%)';
 }
 
 export default function MapView() {
@@ -28,15 +28,14 @@ export default function MapView() {
         },
         (error) => {
           console.error('Location error:', error);
-          // Default to a central location
-          setUserLocation({ lat: 20.5937, lng: 78.9629 }); // India center
+          setUserLocation({ lat: 20.5937, lng: 78.9629 });
         }
       );
     }
   }, []);
 
   const calculateDistance = useCallback((lat1: number, lng1: number, lat2: number, lng2: number) => {
-    const R = 6371; // Earth's radius in km
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLng = (lng2 - lng1) * Math.PI / 180;
     const a = 
@@ -58,21 +57,8 @@ export default function MapView() {
     .sort((a, b) => a.distance - b.distance);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container flex items-center h-16">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2 ml-2">
-            <div className="p-2 rounded-xl eco-gradient">
-              <Leaf className="h-5 w-5 text-white" />
-            </div>
-            <span className="font-display text-xl font-bold text-foreground">Nearby Shops</span>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gradient-to-b from-background to-accent/10">
+      <AppHeader />
 
       <main className="container py-6">
         {/* Map Placeholder - Shows location info */}

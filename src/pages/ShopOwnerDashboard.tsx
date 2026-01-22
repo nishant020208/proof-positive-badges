@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { 
-  Leaf, ArrowLeft, BarChart3, Award, MessageSquare, TrendingUp, 
-  CheckCircle, XCircle, Clock, Send, AlertTriangle, Star
+  BarChart3, Award, MessageSquare, 
+  CheckCircle, XCircle, Clock, Send, Star, Store
 } from 'lucide-react';
 import { GreenScoreRing } from '@/components/GreenScoreRing';
 import { BadgeLevelIndicator } from '@/components/BadgeLevelIndicator';
@@ -213,22 +214,19 @@ export default function ShopOwnerDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      {/* Header */}
-      <header className="glass-morphism sticky top-0 z-50">
-        <div className="container flex items-center h-16">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2 ml-2">
-            <div className="p-2 rounded-xl eco-gradient shadow-lg">
-              <Leaf className="h-5 w-5 text-white" />
-            </div>
-            <span className="font-display text-xl font-bold gradient-text">Shop Dashboard</span>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="container py-8 space-y-8">
+        {/* Page Title */}
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
+            <Store className="h-8 w-8 text-primary" />
+          </div>
+          <div>
+            <h1 className="font-display text-2xl md:text-3xl font-bold">Shop Dashboard</h1>
+            <p className="text-muted-foreground">Monitor your shop performance and badges</p>
+          </div>
+        </div>
         {/* Shop Overview */}
         <Card className="overflow-hidden card-glass border-none">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10" />

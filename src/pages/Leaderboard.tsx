@@ -1,20 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useShops, Shop } from '@/hooks/useShops';
-import { Button } from '@/components/ui/button';
+import { useShops } from '@/hooks/useShops';
+import { AppHeader } from '@/components/AppHeader';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Leaf, ArrowLeft, Trophy, Medal, Award, Search, MapPin, Star } from 'lucide-react';
-
-const CATEGORIES = [
-  { value: 'all', label: 'All Categories' },
-  { value: 'grocery', label: 'Grocery' },
-  { value: 'restaurant', label: 'Restaurant' },
-  { value: 'retail', label: 'Retail' },
-  { value: 'cafe', label: 'Cafe' },
-  { value: 'other', label: 'Other' },
-];
+import { Trophy, Medal, Award, Search, MapPin, Leaf } from 'lucide-react';
 
 function getRankIcon(rank: number) {
   switch (rank) {
@@ -30,7 +21,7 @@ function getRankIcon(rank: number) {
 }
 
 function getGradeColor(score: number) {
-  if (score >= 85) return 'text-green-500';
+  if (score >= 85) return 'text-primary';
   if (score >= 70) return 'text-blue-500';
   if (score >= 50) return 'text-yellow-500';
   return 'text-red-500';
@@ -47,7 +38,6 @@ export default function Leaderboard() {
   const navigate = useNavigate();
   const { shops, loading } = useShops();
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'score' | 'name'>('score');
 
   const filteredAndSortedShops = useMemo(() => {
@@ -56,7 +46,6 @@ export default function Leaderboard() {
       shop.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // Sort shops
     filtered.sort((a, b) => {
       if (sortBy === 'score') {
         return Number(b.green_score) - Number(a.green_score);
@@ -65,24 +54,11 @@ export default function Leaderboard() {
     });
 
     return filtered;
-  }, [shops, searchQuery, categoryFilter, sortBy]);
+  }, [shops, searchQuery, sortBy]);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container flex items-center h-16">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2 ml-2">
-            <div className="p-2 rounded-xl eco-gradient">
-              <Leaf className="h-5 w-5 text-white" />
-            </div>
-            <span className="font-display text-xl font-bold text-foreground">Leaderboard</span>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gradient-to-b from-background to-accent/10">
+      <AppHeader />
 
       <main className="container py-6">
         {/* Stats */}
