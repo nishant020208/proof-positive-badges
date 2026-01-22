@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -9,8 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Leaf, ArrowLeft, Trophy, Target, TrendingUp, 
-  Calendar, MapPin, CheckCircle, XCircle, Clock
+  Trophy, Target, TrendingUp, User,
+  Calendar, CheckCircle, XCircle, Clock
 } from 'lucide-react';
 
 interface UserBadge {
@@ -179,23 +180,21 @@ export default function CustomerProfile() {
   }));
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container flex items-center h-16">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2 ml-2">
-            <div className="p-2 rounded-xl eco-gradient">
-              <Leaf className="h-5 w-5 text-white" />
-            </div>
-            <span className="font-display text-xl font-bold text-foreground">My Profile</span>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gradient-to-b from-background to-accent/10">
+      <AppHeader />
 
       <main className="container py-6 space-y-6">
+        {/* Page Title */}
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
+            <User className="h-8 w-8 text-primary" />
+          </div>
+          <div>
+            <h1 className="font-display text-2xl md:text-3xl font-bold">My Profile</h1>
+            <p className="text-muted-foreground">Track your eco impact and badges</p>
+          </div>
+        </div>
+
         {/* Profile Card */}
         <Card>
           <CardContent className="pt-6">
