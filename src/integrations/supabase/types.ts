@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      appeals: {
+        Row: {
+          appeal_reason: string
+          created_at: string
+          evidence_url: string | null
+          id: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          shop_id: string
+          status: string
+          updated_at: string
+          vote_id: string
+        }
+        Insert: {
+          appeal_reason: string
+          created_at?: string
+          evidence_url?: string | null
+          id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          shop_id: string
+          status?: string
+          updated_at?: string
+          vote_id: string
+        }
+        Update: {
+          appeal_reason?: string
+          created_at?: string
+          evidence_url?: string | null
+          id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          shop_id?: string
+          status?: string
+          updated_at?: string
+          vote_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appeals_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appeals_vote_id_fkey"
+            columns: ["vote_id"]
+            isOneToOne: false
+            referencedRelation: "votes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       badges: {
         Row: {
           category: string
@@ -38,10 +95,43 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          data: Json | null
+          id: string
+          is_read: boolean
+          message: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json | null
+          id?: string
+          is_read?: boolean
+          message: string
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json | null
+          id?: string
+          is_read?: boolean
+          message?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       owner_whitelist: {
         Row: {
           activated_at: string | null
-          added_by: string
+          added_by: string | null
           created_at: string
           email: string
           id: string
@@ -49,7 +139,7 @@ export type Database = {
         }
         Insert: {
           activated_at?: string | null
-          added_by: string
+          added_by?: string | null
           created_at?: string
           email: string
           id?: string
@@ -57,7 +147,7 @@ export type Database = {
         }
         Update: {
           activated_at?: string | null
-          added_by?: string
+          added_by?: string | null
           created_at?: string
           email?: string
           id?: string

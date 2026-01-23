@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { AppealDialog } from '@/components/AppealDialog';
 import { toast } from 'sonner';
 import { 
   BarChart3, Award, MessageSquare, 
-  CheckCircle, XCircle, Clock, Send, Star, Store
+  CheckCircle, XCircle, Clock, Send, Star, Store, AlertTriangle
 } from 'lucide-react';
 import { GreenScoreRing } from '@/components/GreenScoreRing';
 import { BadgeLevelIndicator } from '@/components/BadgeLevelIndicator';
@@ -74,6 +75,7 @@ export default function ShopOwnerDashboard() {
   const [votes, setVotes] = useState<Vote[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVote, setSelectedVote] = useState<Vote | null>(null);
+  const [appealVote, setAppealVote] = useState<Vote | null>(null);
   const [responseText, setResponseText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -408,14 +410,25 @@ export default function ShopOwnerDashboard() {
                           <p className="text-sm text-muted-foreground">{vote.response.response_text}</p>
                         </div>
                       ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedVote(vote)}
-                          className="mt-2"
-                        >
-                          <MessageSquare className="h-3 w-3 mr-1" /> Respond
-                        </Button>
+                        <div className="flex gap-2 mt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedVote(vote)}
+                          >
+                            <MessageSquare className="h-3 w-3 mr-1" /> Respond
+                          </Button>
+                          {vote.vote_type === 'no' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-amber-600 hover:bg-amber-500/10 border-amber-500/30"
+                              onClick={() => setAppealVote(vote)}
+                            >
+                              <AlertTriangle className="h-3 w-3 mr-1" /> Appeal
+                            </Button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -474,6 +487,21 @@ export default function ShopOwnerDashboard() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Appeal Dialog */}
+        {shop && appealVote && (
+          <AppealDialog
+            open={!!appealVote}
+            onOpenChange={(open) => !open && setAppealVote(null)}
+            voteId={appealVote.id}
+            shopId={shop.id}
+            badgeName={appealVote.badge?.name}
+            onSuccess={() => {
+              setAppealVote(null);
+              fetchData();
+            }}
+          />
+        )}
       </main>
     </div>
   );

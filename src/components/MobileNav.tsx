@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { NotificationBell } from '@/components/NotificationBell';
 import { 
   Leaf, Menu, Home, MapPin, Trophy, User, LayoutDashboard, 
   Store, LogIn, LogOut, Shield, X, Plus, Package
@@ -38,13 +39,15 @@ export function MobileNav() {
   );
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="md:hidden relative">
-          <Menu className="h-6 w-6" />
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="left" className="w-80 p-0 border-r-0">
+    <div className="md:hidden flex items-center gap-2">
+      {user && <NotificationBell />}
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon" className="relative">
+            <Menu className="h-6 w-6" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-80 p-0 border-r-0">
         <div className="flex flex-col h-full bg-gradient-to-b from-background to-accent/20">
           {/* Header */}
           <SheetHeader className="p-6 pb-4 border-b border-border/50">
@@ -143,7 +146,8 @@ export function MobileNav() {
             )}
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
