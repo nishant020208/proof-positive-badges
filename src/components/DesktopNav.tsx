@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
+import { NotificationBell } from '@/components/NotificationBell';
 import { 
   Home, MapPin, Trophy, User, LayoutDashboard, 
   Store, LogIn, LogOut, Shield, Plus
@@ -67,6 +68,8 @@ export function DesktopNav() {
       )}
 
       <div className="h-6 w-px bg-border mx-2" />
+
+      {user && <NotificationBell />}
 
       {user ? (
         <Button

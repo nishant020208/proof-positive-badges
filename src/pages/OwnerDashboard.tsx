@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { toast } from 'sonner';
 import { 
   Shield, Users, Store, CheckCircle, XCircle, Clock, 
-  Image, Plus, Trash2, Mail, AlertTriangle, Eye, ThumbsUp, ThumbsDown
+  Image, Plus, Trash2, Mail, AlertTriangle, Eye, ThumbsUp, ThumbsDown, Gavel
 } from 'lucide-react';
 
 interface PendingShop {
@@ -50,6 +50,23 @@ interface WhitelistEntry {
   created_at: string;
 }
 
+interface Appeal {
+  id: string;
+  shop_id: string;
+  vote_id: string;
+  appeal_reason: string;
+  evidence_url: string | null;
+  status: string;
+  created_at: string;
+  shops?: { name: string };
+  votes?: { 
+    badge_id: string; 
+    vote_type: string;
+    proof_image_url: string | null;
+    badges?: { name: string };
+  };
+}
+
 export default function OwnerDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -57,6 +74,7 @@ export default function OwnerDashboard() {
   
   const [pendingShops, setPendingShops] = useState<PendingShop[]>([]);
   const [pendingVotes, setPendingVotes] = useState<PendingVote[]>([]);
+  const [pendingAppeals, setPendingAppeals] = useState<Appeal[]>([]);
   const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [loading, setLoading] = useState(true);
@@ -66,6 +84,7 @@ export default function OwnerDashboard() {
     verifiedShops: 0,
     pendingVotes: 0,
     totalVotes: 0,
+    pendingAppeals: 0,
   });
 
   useEffect(() => {
@@ -104,6 +123,17 @@ export default function OwnerDashboard() {
       .is('owner_approved', null)
       .order('created_at', { ascending: false });
 
+    // Fetch pending appeals
+    const { data: appeals } = await supabase
+      .from('appeals')
+      .select(`
+        *,
+        shops:shop_id(name),
+        votes:vote_id(badge_id, vote_type, proof_image_url, badges:badge_id(name))
+      `)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
     // Fetch whitelist
     const { data: whitelistData } = await supabase
       .from('owner_whitelist')
@@ -126,12 +156,14 @@ export default function OwnerDashboard() {
 
     setPendingShops((shops || []) as PendingShop[]);
     setPendingVotes((votes || []) as PendingVote[]);
+    setPendingAppeals((appeals || []) as Appeal[]);
     setWhitelist((whitelistData || []) as WhitelistEntry[]);
     setStats({
       totalShops: totalShops || 0,
       verifiedShops: verifiedShops || 0,
       pendingVotes: votes?.length || 0,
       totalVotes: totalVotes || 0,
+      pendingAppeals: appeals?.length || 0,
     });
     setLoading(false);
   };
@@ -171,6 +203,25 @@ export default function OwnerDashboard() {
       toast.error('Failed to update vote');
     } else {
       toast.success(approved ? 'Vote approved!' : 'Vote rejected');
+      fetchData();
+    }
+  };
+
+  const handleResolveAppeal = async (appealId: string, approved: boolean, notes?: string) => {
+    const { error } = await supabase
+      .from('appeals')
+      .update({
+        status: approved ? 'approved' : 'rejected',
+        resolved_at: new Date().toISOString(),
+        resolved_by: user?.id,
+        resolution_notes: notes || (approved ? 'Appeal approved' : 'Appeal rejected'),
+      })
+      .eq('id', appealId);
+
+    if (error) {
+      toast.error('Failed to resolve appeal');
+    } else {
+      toast.success(approved ? 'Appeal approved - vote will be reviewed' : 'Appeal rejected');
       fetchData();
     }
   };
@@ -268,31 +319,37 @@ export default function OwnerDashboard() {
 
         {/* Tabs */}
         <Tabs defaultValue="shops" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
             <TabsTrigger value="shops" className="gap-2">
               <Store className="h-4 w-4" />
-              <span className="hidden sm:inline">Pending Shops</span>
-              <span className="sm:hidden">Shops</span>
+              <span className="hidden sm:inline">Shops</span>
               {pendingShops.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-yellow-500/20 text-yellow-500 rounded-full">
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-amber-500/20 text-amber-600 rounded-full">
                   {pendingShops.length}
                 </span>
               )}
             </TabsTrigger>
             <TabsTrigger value="votes" className="gap-2">
               <Image className="h-4 w-4" />
-              <span className="hidden sm:inline">Pending Votes</span>
-              <span className="sm:hidden">Votes</span>
+              <span className="hidden sm:inline">Votes</span>
               {pendingVotes.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-yellow-500/20 text-yellow-500 rounded-full">
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-amber-500/20 text-amber-600 rounded-full">
                   {pendingVotes.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="appeals" className="gap-2">
+              <Gavel className="h-4 w-4" />
+              <span className="hidden sm:inline">Appeals</span>
+              {pendingAppeals.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-amber-500/20 text-amber-600 rounded-full">
+                  {pendingAppeals.length}
                 </span>
               )}
             </TabsTrigger>
             <TabsTrigger value="team" className="gap-2">
               <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Team Access</span>
-              <span className="sm:hidden">Team</span>
+              <span className="hidden sm:inline">Team</span>
             </TabsTrigger>
           </TabsList>
 
@@ -432,6 +489,77 @@ export default function OwnerDashboard() {
                             size="sm"
                             className="bg-green-600 hover:bg-green-700"
                             onClick={() => handleApproveVote(vote.id, true)}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Approve
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+
+          {/* Appeals */}
+          <TabsContent value="appeals" className="space-y-4">
+            {pendingAppeals.length === 0 ? (
+              <Card className="border-border/50">
+                <CardContent className="py-12 text-center">
+                  <Gavel className="h-12 w-12 text-primary mx-auto mb-4" />
+                  <p className="text-lg font-medium">No pending appeals</p>
+                  <p className="text-muted-foreground">All appeals have been resolved</p>
+                </CardContent>
+              </Card>
+            ) : (
+              pendingAppeals.map((appeal) => (
+                <Card key={appeal.id} className="border-border/50 overflow-hidden">
+                  <div className="flex flex-col md:flex-row">
+                    {appeal.evidence_url && (
+                      <div 
+                        className="w-full md:w-48 h-32 md:h-auto cursor-pointer"
+                        onClick={() => setSelectedImage(appeal.evidence_url)}
+                      >
+                        <img
+                          src={appeal.evidence_url}
+                          alt="Appeal evidence"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                            <span className="font-medium">Appeal for {appeal.shops?.name}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Vote: <span className={appeal.votes?.vote_type === 'yes' ? 'text-green-600' : 'text-red-500'}>
+                              {appeal.votes?.vote_type?.toUpperCase()}
+                            </span> on {appeal.votes?.badges?.name}
+                          </p>
+                          <div className="p-3 rounded-lg bg-accent/50 mb-3">
+                            <p className="text-sm">{appeal.appeal_reason}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Submitted {new Date(appeal.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive hover:bg-destructive/10"
+                            onClick={() => handleResolveAppeal(appeal.id, false)}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-primary hover:bg-primary/90"
+                            onClick={() => handleResolveAppeal(appeal.id, true)}
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
                             Approve
