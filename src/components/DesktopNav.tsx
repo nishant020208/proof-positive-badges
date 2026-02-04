@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
+import { useFirebaseUserRole } from '@/hooks/useFirebaseUserRole';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/components/NotificationBell';
 import { 
@@ -11,8 +11,8 @@ import {
 export function DesktopNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut } = useAuth();
-  const { isOwner, isShopOwner } = useUserRole();
+  const { user, signOut } = useFirebaseAuth();
+  const { isOwner, isShopOwner } = useFirebaseUserRole();
 
   const isActive = (path: string) => location.pathname === path;
 

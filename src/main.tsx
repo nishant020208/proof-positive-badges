@@ -1,6 +1,14 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { initializeFirestore } from "./lib/seedData";
+import { initAnalytics } from "./lib/firebase";
+
+// Initialize Firebase Analytics
+initAnalytics();
+
+// Initialize Firestore with seed data if needed
+initializeFirestore().catch(console.error);
 
 // Remove Lovable badge
 const removeLovableBadge = () => {

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
+import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,40 +17,36 @@ import {
 
 interface UserBadge {
   id: string;
-  badge_id: string;
+  badgeId: string;
   percentage: number;
   level: string;
-  is_eligible: boolean;
-  badge_definition?: {
+  isEligible: boolean;
+  badgeDefinition?: {
     id: string;
     name: string;
     description: string;
     category: string;
     icon: string;
-    requirement_value: number;
+    requirementValue: number;
   };
 }
 
 interface VoteHistory {
   id: string;
-  vote_type: string;
-  created_at: string;
-  shop: {
-    id: string;
-    name: string;
-  };
-  badge: {
-    id: string;
-    name: string;
-    icon: string;
-  };
+  voteType: string;
+  createdAt: Date;
+  shopId: string;
+  shopName?: string;
+  badgeId: string;
+  badgeName?: string;
+  badgeIcon?: string;
 }
 
 interface ProfileStats {
-  credibility_score: number;
-  total_reports: number;
-  accepted_reports: number;
-  streak_days: number;
+  credibilityScore: number;
+  totalReports: number;
+  acceptedReports: number;
+  streakDays: number;
 }
 
 const USER_BADGE_CATEGORIES = {
@@ -60,16 +57,16 @@ const USER_BADGE_CATEGORIES = {
 };
 
 export default function CustomerProfile() {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading } = useFirebaseAuth();
   const navigate = useNavigate();
   
   const [userBadges, setUserBadges] = useState<UserBadge[]>([]);
   const [voteHistory, setVoteHistory] = useState<VoteHistory[]>([]);
   const [stats, setStats] = useState<ProfileStats>({
-    credibility_score: 50,
-    total_reports: 0,
-    accepted_reports: 0,
-    streak_days: 0,
+    credibilityScore: 50,
+    totalReports: 0,
+    acceptedReports: 0,
+    streakDays: 0,
   });
   const [loadingData, setLoadingData] = useState(true);
 
@@ -80,68 +77,88 @@ export default function CustomerProfile() {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    if (profile) {
+    if (user && profile) {
       fetchUserData();
     }
-  }, [profile]);
+  }, [user, profile]);
 
   const fetchUserData = async () => {
-    if (!profile) return;
+    if (!user || !profile) return;
     setLoadingData(true);
 
     try {
-      // Fetch profile stats
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('credibility_score, total_reports, accepted_reports, streak_days')
-        .eq('id', profile.id)
-        .single();
-      
-      if (profileData) {
-        setStats({
-          credibility_score: profileData.credibility_score || 50,
-          total_reports: profileData.total_reports || 0,
-          accepted_reports: profileData.accepted_reports || 0,
-          streak_days: profileData.streak_days || 0,
-        });
-      }
+      // Set stats from profile
+      setStats({
+        credibilityScore: profile.credibilityScore || 50,
+        totalReports: profile.totalReports || 0,
+        acceptedReports: profile.acceptedReports || 0,
+        streakDays: profile.streakDays || 0,
+      });
 
       // Fetch user badges
-      const { data: badgesData } = await supabase
-        .from('user_badges')
-        .select('*')
-        .eq('user_id', profile.id);
+      const userBadgesQuery = query(
+        collection(db, 'userBadges'),
+        where('userId', '==', user.uid)
+      );
+      const badgesSnapshot = await getDocs(userBadgesQuery);
       
       // Fetch badge definitions
-      const { data: badgeDefsData } = await supabase
-        .from('user_badge_definitions')
-        .select('*');
+      const badgeDefsSnapshot = await getDocs(collection(db, 'userBadgeDefinitions'));
+      const badgeDefs = badgeDefsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      if (badgesData && badgeDefsData) {
-        const badgesWithDefs = badgesData.map(badge => ({
-          ...badge,
-          badge_definition: badgeDefsData.find(def => def.id === badge.badge_id),
-        }));
-        setUserBadges(badgesWithDefs as UserBadge[]);
-      }
+      const badges: UserBadge[] = badgesSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const def = badgeDefs.find(d => d.id === data.badgeId);
+        return {
+          id: doc.id,
+          badgeId: data.badgeId,
+          percentage: data.percentage || 0,
+          level: data.level || 'none',
+          isEligible: data.isEligible || false,
+          badgeDefinition: def ? {
+            id: def.id,
+            name: (def as any).name,
+            description: (def as any).description,
+            category: (def as any).category,
+            icon: (def as any).icon,
+            requirementValue: (def as any).requirementValue || 100,
+          } : undefined,
+        };
+      });
+      setUserBadges(badges);
 
       // Fetch vote history
-      const { data: votesData } = await supabase
-        .from('votes')
-        .select(`
-          id,
-          vote_type,
-          created_at,
-          shop:shops(id, name),
-          badge:badges(id, name, icon)
-        `)
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const votesQuery = query(
+        collection(db, 'votes'),
+        where('userId', '==', user.uid),
+        orderBy('createdAt', 'desc'),
+        limit(50)
+      );
+      const votesSnapshot = await getDocs(votesQuery);
       
-      if (votesData) {
-        setVoteHistory(votesData as unknown as VoteHistory[]);
-      }
+      // Fetch shops and badges for vote details
+      const shopsSnapshot = await getDocs(collection(db, 'shops'));
+      const shops = Object.fromEntries(shopsSnapshot.docs.map(d => [d.id, d.data()]));
+      
+      const badgesDefSnapshot = await getDocs(collection(db, 'badges'));
+      const allBadges = Object.fromEntries(badgesDefSnapshot.docs.map(d => [d.id, d.data()]));
+      
+      const votes: VoteHistory[] = votesSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const shop = shops[data.shopId];
+        const badge = allBadges[data.badgeId];
+        return {
+          id: doc.id,
+          voteType: data.voteType,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          shopId: data.shopId,
+          shopName: (shop as any)?.name,
+          badgeId: data.badgeId,
+          badgeName: (badge as any)?.name,
+          badgeIcon: (badge as any)?.icon,
+        };
+      });
+      setVoteHistory(votes);
     } catch (error) {
       console.error('Error fetching user data:', error);
     } finally {
@@ -176,7 +193,7 @@ export default function CustomerProfile() {
   const badgesByCategory = Object.entries(USER_BADGE_CATEGORIES).map(([key, info]) => ({
     ...info,
     key,
-    badges: userBadges.filter(b => b.badge_definition?.category === key),
+    badges: userBadges.filter(b => b.badgeDefinition?.category === key),
   }));
 
   return (
@@ -200,28 +217,28 @@ export default function CustomerProfile() {
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={profile?.avatar_url || ''} />
+                <AvatarImage src={profile?.avatarUrl || ''} />
                 <AvatarFallback className="text-2xl bg-primary/10 text-primary">
-                  {profile?.full_name?.charAt(0) || profile?.email?.charAt(0) || 'U'}
+                  {profile?.fullName?.charAt(0) || profile?.email?.charAt(0) || 'U'}
                 </AvatarFallback>
               </Avatar>
               
               <div className="flex-1">
-                <h2 className="text-2xl font-bold">{profile?.full_name || 'Green User'}</h2>
+                <h2 className="text-2xl font-bold">{profile?.fullName || 'Green User'}</h2>
                 <p className="text-muted-foreground">{profile?.email}</p>
                 
                 <div className="flex items-center gap-4 mt-3">
                   <div className="flex items-center gap-1">
                     <Trophy className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">{userBadges.filter(b => b.is_eligible).length} Badges</span>
+                    <span className="text-sm font-medium">{userBadges.filter(b => b.isEligible).length} Badges</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Target className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">{stats.total_reports} Reports</span>
+                    <span className="text-sm font-medium">{stats.totalReports} Reports</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Calendar className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">{stats.streak_days} Day Streak</span>
+                    <span className="text-sm font-medium">{stats.streakDays} Day Streak</span>
                   </div>
                 </div>
               </div>
@@ -233,8 +250,8 @@ export default function CustomerProfile() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="pt-4 text-center">
-              <div className={`text-3xl font-bold ${getCredibilityColor(stats.credibility_score)}`}>
-                {stats.credibility_score}%
+              <div className={`text-3xl font-bold ${getCredibilityColor(stats.credibilityScore)}`}>
+                {stats.credibilityScore}%
               </div>
               <p className="text-sm text-muted-foreground">Credibility Score</p>
             </CardContent>
@@ -242,21 +259,21 @@ export default function CustomerProfile() {
           
           <Card>
             <CardContent className="pt-4 text-center">
-              <div className="text-3xl font-bold text-primary">{stats.total_reports}</div>
+              <div className="text-3xl font-bold text-primary">{stats.totalReports}</div>
               <p className="text-sm text-muted-foreground">Total Reports</p>
             </CardContent>
           </Card>
           
           <Card>
             <CardContent className="pt-4 text-center">
-              <div className="text-3xl font-bold text-green-500">{stats.accepted_reports}</div>
+              <div className="text-3xl font-bold text-green-500">{stats.acceptedReports}</div>
               <p className="text-sm text-muted-foreground">Accepted Reports</p>
             </CardContent>
           </Card>
           
           <Card>
             <CardContent className="pt-4 text-center">
-              <div className="text-3xl font-bold text-orange-500">{stats.streak_days}</div>
+              <div className="text-3xl font-bold text-orange-500">{stats.streakDays}</div>
               <p className="text-sm text-muted-foreground">Day Streak</p>
             </CardContent>
           </Card>
@@ -283,23 +300,23 @@ export default function CustomerProfile() {
                     <div className="space-y-3">
                       {category.badges.map((badge) => (
                         <div key={badge.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                          <span className="text-2xl">{badge.badge_definition?.icon}</span>
+                          <span className="text-2xl">{badge.badgeDefinition?.icon}</span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium truncate">{badge.badge_definition?.name}</span>
-                              {badge.is_eligible && (
+                              <span className="font-medium truncate">{badge.badgeDefinition?.name}</span>
+                              {badge.isEligible && (
                                 <Badge className={getLevelColor(badge.level)}>
                                   {badge.level.charAt(0).toUpperCase() + badge.level.slice(1)}
                                 </Badge>
                               )}
                             </div>
                             <p className="text-xs text-muted-foreground truncate">
-                              {badge.badge_definition?.description}
+                              {badge.badgeDefinition?.description}
                             </p>
                             <div className="mt-2">
                               <div className="flex justify-between text-xs mb-1">
                                 <span>{badge.percentage}%</span>
-                                <span>Target: {badge.badge_definition?.requirement_value || 100}%</span>
+                                <span>Target: {badge.badgeDefinition?.requirementValue || 100}%</span>
                               </div>
                               <Progress value={badge.percentage} className="h-2" />
                             </div>
@@ -346,10 +363,10 @@ export default function CustomerProfile() {
                       <div 
                         key={vote.id} 
                         className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted"
-                        onClick={() => navigate(`/shop/${vote.shop?.id}`)}
+                        onClick={() => navigate(`/shop/${vote.shopId}`)}
                       >
-                        <div className={`p-2 rounded-full ${vote.vote_type === 'yes' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
-                          {vote.vote_type === 'yes' ? (
+                        <div className={`p-2 rounded-full ${vote.voteType === 'yes' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+                          {vote.voteType === 'yes' ? (
                             <CheckCircle className="h-5 w-5 text-green-500" />
                           ) : (
                             <XCircle className="h-5 w-5 text-red-500" />
@@ -357,20 +374,20 @@ export default function CustomerProfile() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">{vote.shop?.name}</span>
+                            <span className="font-medium truncate">{vote.shopName || 'Unknown Shop'}</span>
                           </div>
                           <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <span>{vote.badge?.icon}</span>
-                            <span>{vote.badge?.name}</span>
+                            <span>{vote.badgeIcon}</span>
+                            <span>{vote.badgeName || vote.badgeId}</span>
                           </p>
                         </div>
                         <div className="text-right">
-                          <Badge variant={vote.vote_type === 'yes' ? 'default' : 'destructive'}>
-                            {vote.vote_type.toUpperCase()}
+                          <Badge variant={vote.voteType === 'yes' ? 'default' : 'destructive'}>
+                            {vote.voteType.toUpperCase()}
                           </Badge>
                           <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1 justify-end">
                             <Clock className="h-3 w-3" />
-                            {new Date(vote.created_at).toLocaleDateString()}
+                            {vote.createdAt.toLocaleDateString()}
                           </p>
                         </div>
                       </div>

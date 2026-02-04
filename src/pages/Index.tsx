@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
+import { getShops, Shop } from '@/lib/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { GreenScoreRing } from '@/components/GreenScoreRing';
@@ -10,19 +12,9 @@ import {
   CheckCircle, ArrowRight, Sparkles, Shield
 } from 'lucide-react';
 
-interface Shop {
-  id: string;
-  name: string;
-  address: string;
-  green_score: number | null;
-  is_verified: boolean | null;
-  shop_image_url: string | null;
-  tagline: string | null;
-}
-
 const Index = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useFirebaseAuth();
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,22 +22,24 @@ const Index = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: shopsData } = await supabase
-        .from('shops')
-        .select('id, name, address, green_score, is_verified, shop_image_url, tagline')
-        .eq('is_verified', true)
-        .order('green_score', { ascending: false });
-      
-      const { count: voteCount } = await supabase
-        .from('votes')
-        .select('*', { count: 'exact', head: true });
-      
-      setShops(shopsData || []);
-      setStats(prev => ({ 
-        ...prev, 
-        shops: shopsData?.length || 0,
-        votes: voteCount || 0 
-      }));
+      try {
+        const shopsData = await getShops();
+        const verifiedShops = shopsData
+          .filter(s => s.isVerified)
+          .sort((a, b) => (b.greenScore || 0) - (a.greenScore || 0));
+        
+        // Get vote count
+        const votesSnapshot = await getDocs(collection(db, 'votes'));
+        
+        setShops(verifiedShops);
+        setStats(prev => ({ 
+          ...prev, 
+          shops: verifiedShops.length,
+          votes: votesSnapshot.size 
+        }));
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
       setLoading(false);
     };
     fetchData();
@@ -200,9 +194,9 @@ const Index = () => {
 
                   {/* Image */}
                   <div className="h-48 overflow-hidden">
-                    {shop.shop_image_url ? (
+                    {shop.shopImageUrl ? (
                       <img
-                        src={shop.shop_image_url}
+                        src={shop.shopImageUrl}
                         alt={shop.name}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
@@ -222,7 +216,7 @@ const Index = () => {
                           <h3 className="font-display font-semibold text-lg text-white truncate">
                             {shop.name}
                           </h3>
-                          {shop.is_verified && (
+                          {shop.isVerified && (
                             <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
                           )}
                         </div>
@@ -231,7 +225,7 @@ const Index = () => {
                           <p className="text-xs text-white/50 mt-1 truncate">{shop.tagline}</p>
                         )}
                       </div>
-                      <GreenScoreRing score={Math.round(Number(shop.green_score) || 0)} size="md" />
+                      <GreenScoreRing score={Math.round(Number(shop.greenScore) || 0)} size="md" />
                     </div>
                   </div>
                 </div>
@@ -255,10 +249,10 @@ const Index = () => {
                   onClick={() => navigate(`/shop/${shop.id}`)}
                 >
                   <div className="flex items-start gap-4">
-                    {shop.shop_image_url ? (
+                    {shop.shopImageUrl ? (
                       <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0">
                         <img
-                          src={shop.shop_image_url}
+                          src={shop.shopImageUrl}
                           alt={shop.name}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform"
                         />
@@ -272,14 +266,14 @@ const Index = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <h3 className="font-semibold truncate">{shop.name}</h3>
-                        {shop.is_verified && (
+                        {shop.isVerified && (
                           <CheckCircle className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground truncate">{shop.address}</p>
                     </div>
 
-                    <GreenScoreRing score={Math.round(Number(shop.green_score) || 0)} size="sm" />
+                    <GreenScoreRing score={Math.round(Number(shop.greenScore) || 0)} size="sm" />
                   </div>
                 </div>
               ))}

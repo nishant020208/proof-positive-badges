@@ -1,19 +1,33 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { useShopBadges, useUserVotes, Shop } from '@/hooks/useShops';
+import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
 import { useAIVerification } from '@/hooks/useAIVerification';
-import { supabase } from '@/integrations/supabase/client';
+import { 
+  getShopById, 
+  getBadges, 
+  getShopBadges, 
+  createVote, 
+  uploadFile,
+  Shop,
+  Badge,
+  ShopBadge
+} from '@/lib/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { MapPin, CheckCircle, ThumbsUp, ThumbsDown, Camera, Award, Brain, AlertCircle, Upload } from 'lucide-react';
+import { MapPin, CheckCircle, ThumbsUp, ThumbsDown, Camera, Award, Brain, Upload } from 'lucide-react';
 import { GreenScoreRing } from '@/components/GreenScoreRing';
 import { BadgeLevelIndicator } from '@/components/BadgeLevelIndicator';
 import { BadgeProgressBar } from '@/components/BadgeProgressBar';
 import { AIVerificationPanel } from '@/components/AIVerificationPanel';
+
+interface ShopBadgeWithDetails extends ShopBadge {
+  badge: Badge;
+}
 
 const CATEGORY_INFO: Record<string, { name: string; icon: string; color: string }> = {
   plastic_packaging: { name: 'Plastic & Packaging', icon: '♻️', color: 'hsl(152, 45%, 28%)' },
@@ -25,12 +39,12 @@ const CATEGORY_INFO: Record<string, { name: string; icon: string; color: string 
 export default function ShopDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
-  const { badges, loading: badgesLoading } = useShopBadges(id || null);
-  const { votes: userVotes, loading: votesLoading } = useUserVotes(profile?.id || null, id || null);
+  const { user, profile } = useFirebaseAuth();
   const { isVerifying, verificationResult, verifyProofImage, clearResult } = useAIVerification();
   
   const [shop, setShop] = useState<Shop | null>(null);
+  const [badges, setBadges] = useState<ShopBadgeWithDetails[]>([]);
+  const [userVotes, setUserVotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [votingBadge, setVotingBadge] = useState<string | null>(null);
   const [votingBadgeName, setVotingBadgeName] = useState<string>('');
@@ -44,24 +58,67 @@ export default function ShopDetails() {
   useEffect(() => {
     if (!id) return;
 
-    const fetchShop = async () => {
-      const { data, error } = await supabase
-        .from('shops')
-        .select('*')
-        .eq('id', id)
-        .single();
-      
-      if (error) {
-        toast.error('Shop not found');
-        navigate('/');
-      } else {
-        setShop(data as Shop);
+    const fetchData = async () => {
+      try {
+        // Fetch shop
+        const shopData = await getShopById(id);
+        if (!shopData) {
+          toast.error('Shop not found');
+          navigate('/');
+          return;
+        }
+        setShop(shopData);
+
+        // Fetch all badges
+        const allBadges = await getBadges();
+        
+        // Fetch shop badges
+        const shopBadges = await getShopBadges(id);
+        
+        // Combine badges with shop badge data
+        const badgesWithDetails: ShopBadgeWithDetails[] = allBadges.map(badge => {
+          const shopBadge = shopBadges.find(sb => sb.badgeId === badge.id);
+          return {
+            id: shopBadge?.id || `new-${badge.id}`,
+            shopId: id,
+            badgeId: badge.id,
+            yesCount: shopBadge?.yesCount || 0,
+            noCount: shopBadge?.noCount || 0,
+            percentage: shopBadge?.percentage || 0,
+            level: shopBadge?.level || 'none',
+            isEligible: shopBadge?.isEligible || false,
+            createdAt: shopBadge?.createdAt || new Date(),
+            updatedAt: shopBadge?.updatedAt || new Date(),
+            badge: badge,
+          };
+        });
+        
+        setBadges(badgesWithDetails);
+
+        // Fetch user votes if logged in
+        if (user) {
+          const votesQuery = query(
+            collection(db, 'votes'),
+            where('userId', '==', user.uid),
+            where('shopId', '==', id)
+          );
+          const votesSnapshot = await getDocs(votesQuery);
+          const votes: Record<string, string> = {};
+          votesSnapshot.forEach(doc => {
+            const data = doc.data();
+            votes[data.badgeId] = data.voteType;
+          });
+          setUserVotes(votes);
+        }
+      } catch (error) {
+        console.error('Error fetching shop:', error);
+        toast.error('Failed to load shop');
       }
       setLoading(false);
     };
 
-    fetchShop();
-  }, [id, navigate]);
+    fetchData();
+  }, [id, navigate, user]);
 
   const getCurrentLocation = useCallback(() => {
     if (navigator.geolocation) {
@@ -139,7 +196,7 @@ export default function ShopDetails() {
   };
 
   const submitVote = async () => {
-    if (!profile || !votingBadge || !voteType || !id) return;
+    if (!user || !votingBadge || !voteType || !id) return;
 
     if (!proofImage) {
       toast.error('Please upload a proof image');
@@ -150,22 +207,8 @@ export default function ShopDetails() {
 
     try {
       // Upload proof image
-      const fileExt = proofImage.name.split('.').pop();
-      const fileName = `votes/${id}/${votingBadge}/${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('proof-images')
-        .upload(fileName, proofImage);
-      
-      if (uploadError) {
-        toast.error('Failed to upload proof image');
-        setIsSubmitting(false);
-        return;
-      }
-
-      const { data: urlData } = supabase.storage
-        .from('proof-images')
-        .getPublicUrl(fileName);
+      const fileName = `votes/${id}/${votingBadge}/${Date.now()}.${proofImage.name.split('.').pop()}`;
+      const proofImageUrl = await uploadFile(proofImage, fileName);
 
       // Get AI verification data
       const proofResult = verificationResult as {
@@ -175,38 +218,35 @@ export default function ShopDetails() {
         reason?: string;
       } | null;
 
-      // Submit vote with AI verification data
-      const { error: voteError } = await supabase.from('votes').insert({
-        user_id: profile.id,
-        shop_id: id,
-        badge_id: votingBadge,
-        vote_type: voteType,
-        proof_image_url: urlData.publicUrl,
+      // Submit vote
+      await createVote({
+        userId: user.uid,
+        shopId: id,
+        badgeId: votingBadge,
+        voteType: voteType,
+        proofImageUrl: proofImageUrl,
         latitude: userLocation?.lat || null,
         longitude: userLocation?.lng || null,
-        ai_verified: proofResult?.isValid ?? false,
-        ai_confidence_score: proofResult?.confidence ?? 0,
-        ai_verification_result: proofResult ? JSON.stringify({
+        aiVerified: proofResult?.isValid ?? false,
+        aiConfidenceScore: proofResult?.confidence ?? 0,
+        aiVerificationResult: proofResult ? JSON.stringify({
           supports: proofResult.supports,
           reason: proofResult.reason,
         }) : null,
+        ownerApproved: null,
+        ownerApprovedAt: null,
+        ownerApprovedBy: null,
+        ownerRejectionReason: null,
       });
 
-      if (voteError) {
-        if (voteError.message.includes('duplicate')) {
-          toast.error('You have already voted on this badge');
-        } else {
-          toast.error('Failed to submit vote');
-        }
-      } else {
-        toast.success(
-          voteType === 'yes'
-            ? 'Verification confirmed! Thank you!'
-            : 'Report submitted. Thanks for keeping it honest.'
-        );
-        // Refresh badges
-        window.location.reload();
-      }
+      toast.success(
+        voteType === 'yes'
+          ? 'Verification confirmed! Thank you!'
+          : 'Report submitted. Thanks for keeping it honest.'
+      );
+      
+      // Refresh page
+      window.location.reload();
     } catch (err) {
       toast.error('An error occurred');
       console.error(err);
@@ -218,7 +258,7 @@ export default function ShopDetails() {
     }
   };
 
-  if (loading || badgesLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -235,12 +275,9 @@ export default function ShopDetails() {
     if (!acc[category]) acc[category] = [];
     acc[category].push(badge);
     return acc;
-  }, {} as Record<string, typeof badges>);
+  }, {} as Record<string, ShopBadgeWithDetails[]>);
 
-  const earnedBadges = badges.filter(b => b.level !== 'none' && b.is_eligible);
-
-  // Check if current user is the shop owner
-  const isOwner = profile?.id === shop.owner_id;
+  const earnedBadges = badges.filter(b => b.level !== 'none' && b.isEligible);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-accent/10">
@@ -249,10 +286,10 @@ export default function ShopDetails() {
       <main className="container py-6 space-y-6">
         {/* Shop Header */}
         <Card className="overflow-hidden glass-card">
-          {shop.shop_image_url && (
+          {shop.shopImageUrl && (
             <div className="h-48 overflow-hidden">
               <img
-                src={shop.shop_image_url}
+                src={shop.shopImageUrl}
                 alt={shop.name}
                 className="w-full h-full object-cover"
               />
@@ -260,12 +297,12 @@ export default function ShopDetails() {
           )}
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row md:items-center gap-6">
-              <GreenScoreRing score={Math.round(Number(shop.green_score))} size="lg" />
+              <GreenScoreRing score={Math.round(Number(shop.greenScore))} size="lg" />
               
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <h1 className="font-display text-2xl font-bold">{shop.name}</h1>
-                  {shop.is_verified && (
+                  {shop.isVerified && (
                     <CheckCircle className="h-5 w-5 text-primary" />
                   )}
                 </div>
@@ -287,7 +324,7 @@ export default function ShopDetails() {
                     <div className="flex gap-1">
                       {earnedBadges.slice(0, 5).map(b => (
                         <span
-                          key={b.badge_id}
+                          key={b.badgeId}
                           className={`px-2 py-0.5 rounded text-xs font-medium ${
                             b.level === 'gold' ? 'bg-yellow-100 text-yellow-800' :
                             b.level === 'silver' ? 'bg-gray-100 text-gray-800' :
@@ -319,11 +356,11 @@ export default function ShopDetails() {
             </CardHeader>
             <CardContent className="space-y-4">
               {categoryBadges.map((badge) => {
-                const hasVoted = !!userVotes[badge.badge_id];
+                const hasVoted = !!userVotes[badge.badgeId];
                 
                 return (
                   <div
-                    key={badge.badge_id}
+                    key={badge.badgeId}
                     className="p-4 rounded-xl border border-border bg-card/50 hover:bg-card/80 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -339,24 +376,24 @@ export default function ShopDetails() {
                         {/* Stats */}
                         <div className="flex items-center gap-4 text-sm mb-3">
                           <span className="text-green-600">
-                            ✓ {badge.yes_count} Yes
+                            ✓ {badge.yesCount} Yes
                           </span>
                           <span className="text-red-500">
-                            ✗ {badge.no_count} No
+                            ✗ {badge.noCount} No
                           </span>
                           <span className="font-medium">
                             {Math.round(Number(badge.percentage))}%
                           </span>
-                          {!badge.is_eligible && (
+                          {!badge.isEligible && (
                             <span className="text-xs text-muted-foreground">
-                              ({10 - (badge.yes_count + badge.no_count)} more votes needed)
+                              ({10 - (badge.yesCount + badge.noCount)} more votes needed)
                             </span>
                           )}
                         </div>
                         
                         <BadgeProgressBar 
                           percentage={Number(badge.percentage)} 
-                          isEligible={badge.is_eligible ?? false}
+                          isEligible={badge.isEligible ?? false}
                           level={badge.level ?? 'none'}
                         />
                       </div>
@@ -365,18 +402,18 @@ export default function ShopDetails() {
                       <div className="flex flex-col gap-2">
                         <Button
                           size="sm"
-                          variant={hasVoted && userVotes[badge.badge_id] === 'yes' ? 'default' : 'outline'}
-                          className={hasVoted && userVotes[badge.badge_id] === 'yes' ? 'bg-green-600 hover:bg-green-700' : ''}
-                          onClick={() => handleVoteClick(badge.badge_id, badge.badge.name, 'yes')}
+                          variant={hasVoted && userVotes[badge.badgeId] === 'yes' ? 'default' : 'outline'}
+                          className={hasVoted && userVotes[badge.badgeId] === 'yes' ? 'bg-green-600 hover:bg-green-700' : ''}
+                          onClick={() => handleVoteClick(badge.badgeId, badge.badge.name, 'yes')}
                           disabled={hasVoted}
                         >
                           <ThumbsUp className="h-4 w-4" />
                         </Button>
                         <Button
                           size="sm"
-                          variant={hasVoted && userVotes[badge.badge_id] === 'no' ? 'default' : 'outline'}
-                          className={hasVoted && userVotes[badge.badge_id] === 'no' ? 'bg-red-600 hover:bg-red-700' : ''}
-                          onClick={() => handleVoteClick(badge.badge_id, badge.badge.name, 'no')}
+                          variant={hasVoted && userVotes[badge.badgeId] === 'no' ? 'default' : 'outline'}
+                          className={hasVoted && userVotes[badge.badgeId] === 'no' ? 'bg-red-600 hover:bg-red-700' : ''}
+                          onClick={() => handleVoteClick(badge.badgeId, badge.badge.name, 'no')}
                           disabled={hasVoted}
                         >
                           <ThumbsDown className="h-4 w-4" />
@@ -457,12 +494,6 @@ export default function ShopDetails() {
                 </>
               )}
             </Button>
-
-            {aiVerified && verificationResult && (
-              <p className="text-xs text-center text-muted-foreground">
-                AI confidence: {verificationResult.confidence}%
-              </p>
-            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -6,19 +6,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
+import { subscribeToNotifications, markNotificationRead, Notification } from '@/lib/firestore';
+import { collection, query, where, orderBy, limit, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: 'info' | 'success' | 'warning' | 'badge' | 'score';
-  is_read: boolean;
-  created_at: string;
-  data: Record<string, any>;
-}
 
 const TYPE_ICONS = {
   info: Bell,
@@ -37,7 +29,7 @@ const TYPE_COLORS = {
 };
 
 export function NotificationBell() {
-  const { user } = useAuth();
+  const { user } = useFirebaseAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -45,77 +37,41 @@ export function NotificationBell() {
   useEffect(() => {
     if (!user) return;
 
-    fetchNotifications();
-
     // Subscribe to realtime notifications
-    const channel = supabase
-      .channel('user-notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const newNotification = payload.new as Notification;
-          setNotifications((prev) => [newNotification, ...prev]);
-          setUnreadCount((prev) => prev + 1);
-        }
-      )
-      .subscribe();
+    const unsubscribe = subscribeToNotifications(user.uid, (newNotifications) => {
+      setNotifications(newNotifications);
+      setUnreadCount(newNotifications.filter((n) => !n.isRead).length);
+    });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => unsubscribe();
   }, [user]);
 
-  const fetchNotifications = async () => {
-    if (!user) return;
-
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    if (data) {
-      setNotifications(data as Notification[]);
-      setUnreadCount(data.filter((n) => !n.is_read).length);
-    }
-  };
-
-  const markAsRead = async (notificationId: string) => {
-    await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId);
-
+  const handleMarkAsRead = async (notificationId: string) => {
+    await markNotificationRead(notificationId);
     setNotifications((prev) =>
       prev.map((n) =>
-        n.id === notificationId ? { ...n, is_read: true } : n
+        n.id === notificationId ? { ...n, isRead: true } : n
       )
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
   };
 
   const markAllAsRead = async () => {
-    await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('user_id', user?.id)
-      .eq('is_read', false);
-
+    if (!user) return;
+    
+    const promises = notifications
+      .filter((n) => !n.isRead)
+      .map((n) => markNotificationRead(n.id));
+    
+    await Promise.all(promises);
+    
     setNotifications((prev) =>
-      prev.map((n) => ({ ...n, is_read: true }))
+      prev.map((n) => ({ ...n, isRead: true }))
     );
     setUnreadCount(0);
   };
 
-  const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr);
+  const formatTime = (date: Date) => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const minutes = Math.floor(diff / 60000);
@@ -168,17 +124,17 @@ export function NotificationBell() {
             </div>
           ) : (
             notifications.map((notification) => {
-              const Icon = TYPE_ICONS[notification.type] || Bell;
-              const colorClass = TYPE_COLORS[notification.type] || 'text-muted-foreground';
+              const Icon = TYPE_ICONS[notification.type as keyof typeof TYPE_ICONS] || Bell;
+              const colorClass = TYPE_COLORS[notification.type as keyof typeof TYPE_COLORS] || 'text-muted-foreground';
 
               return (
                 <div
                   key={notification.id}
                   className={cn(
                     'flex items-start gap-3 p-3 border-b border-border/50 transition-colors cursor-pointer hover:bg-accent/50',
-                    !notification.is_read && 'bg-primary/5'
+                    !notification.isRead && 'bg-primary/5'
                   )}
-                  onClick={() => markAsRead(notification.id)}
+                  onClick={() => handleMarkAsRead(notification.id)}
                 >
                   <div className={cn('mt-0.5', colorClass)}>
                     <Icon className="h-5 w-5" />
@@ -186,7 +142,7 @@ export function NotificationBell() {
                   <div className="flex-1 min-w-0">
                     <p className={cn(
                       'text-sm font-medium',
-                      !notification.is_read && 'text-foreground'
+                      !notification.isRead && 'text-foreground'
                     )}>
                       {notification.title}
                     </p>
@@ -194,10 +150,10 @@ export function NotificationBell() {
                       {notification.message}
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-1">
-                      {formatTime(notification.created_at)}
+                      {formatTime(notification.createdAt)}
                     </p>
                   </div>
-                  {!notification.is_read && (
+                  {!notification.isRead && (
                     <div className="w-2 h-2 rounded-full bg-primary mt-2" />
                   )}
                 </div>
