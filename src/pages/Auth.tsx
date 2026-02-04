@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +21,7 @@ const authSchema = z.object({
 type UserType = 'customer' | 'shop_owner' | 'owner';
 
 export default function Auth() {
-  const { user, signIn, signUp, loading } = useAuth();
+  const { user, signIn, signUp, loading } = useFirebaseAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
@@ -51,13 +52,13 @@ export default function Auth() {
 
   const checkOwnerWhitelist = async (emailToCheck: string) => {
     setCheckingWhitelist(true);
-    const { data } = await supabase
-      .from('owner_whitelist')
-      .select('id, status')
-      .eq('email', emailToCheck.toLowerCase())
-      .single();
-    
-    setIsWhitelisted(!!data && data.status === 'pending');
+    try {
+      const docRef = doc(db, 'ownerWhitelist', emailToCheck.toLowerCase());
+      const docSnap = await getDoc(docRef);
+      setIsWhitelisted(docSnap.exists() && docSnap.data()?.status === 'pending');
+    } catch (error) {
+      setIsWhitelisted(false);
+    }
     setCheckingWhitelist(false);
   };
 
@@ -99,8 +100,10 @@ export default function Auth() {
       if (authMode === 'login') {
         const { error } = await signIn(email, password);
         if (error) {
-          if (error.message.includes('Invalid login credentials')) {
+          if (error.message.includes('auth/invalid-credential') || error.message.includes('auth/wrong-password')) {
             toast.error('Invalid email or password');
+          } else if (error.message.includes('auth/user-not-found')) {
+            toast.error('No account found with this email');
           } else {
             toast.error(error.message);
           }
@@ -109,33 +112,15 @@ export default function Auth() {
           navigate('/');
         }
       } else {
-        const role = userType === 'owner' ? 'customer' : userType;
-        const { error } = await signUp(email, password, fullName, role);
+        const { error } = await signUp(email, password, fullName, userType);
         
         if (error) {
-          if (error.message.includes('already registered')) {
+          if (error.message.includes('auth/email-already-in-use')) {
             toast.error('This email is already registered. Please login instead.');
           } else {
             toast.error(error.message);
           }
         } else {
-          if (userType === 'owner') {
-            setTimeout(async () => {
-              const { data: { user: newUser } } = await supabase.auth.getUser();
-              if (newUser) {
-                await supabase.from('user_roles').insert({
-                  user_id: newUser.id,
-                  role: 'owner',
-                });
-                
-                await supabase
-                  .from('owner_whitelist')
-                  .update({ status: 'activated', activated_at: new Date().toISOString() })
-                  .eq('email', email.toLowerCase());
-              }
-            }, 1500);
-          }
-          
           toast.success('Account created successfully!');
           navigate('/');
         }

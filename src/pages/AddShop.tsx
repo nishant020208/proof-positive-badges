@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
 import { useAIVerification } from '@/hooks/useAIVerification';
-import { supabase } from '@/integrations/supabase/client';
+import { createShop, uploadFile } from '@/lib/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Leaf, ArrowLeft, MapPin, Upload, Store, FileText, CreditCard, Image, CheckCircle, Brain, Sparkles } from 'lucide-react';
+import { Leaf, ArrowLeft, MapPin, Store, FileText, CreditCard, Image, CheckCircle, Brain, Sparkles } from 'lucide-react';
 import LocationMapPreview from '@/components/LocationMapPreview';
 import { AIVerificationPanel } from '@/components/AIVerificationPanel';
 import { z } from 'zod';
@@ -22,7 +22,7 @@ const shopSchema = z.object({
 });
 
 export default function AddShop() {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading } = useFirebaseAuth();
   const navigate = useNavigate();
   const { isVerifying, verificationResult, verifyShopImage, clearResult } = useAIVerification();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -124,26 +124,6 @@ export default function AddShop() {
     }
   };
 
-  const uploadFile = async (file: File, path: string): Promise<string | null> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${path}/${Date.now()}.${fileExt}`;
-    
-    const { error } = await supabase.storage
-      .from('shop-images')
-      .upload(fileName, file);
-    
-    if (error) {
-      console.error('Upload error:', error);
-      return null;
-    }
-    
-    const { data } = supabase.storage
-      .from('shop-images')
-      .getPublicUrl(fileName);
-    
-    return data.publicUrl;
-  };
-
   const validateForm = () => {
     try {
       shopSchema.parse({ name, description, address, gstNumber });
@@ -182,15 +162,15 @@ export default function AddShop() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm() || !profile) return;
+    if (!validateForm() || !user) return;
 
     setIsSubmitting(true);
 
     try {
-      // Upload files
-      const shopImageUrl = shopImage ? await uploadFile(shopImage, 'shops') : null;
-      const certificateUrl = certificate ? await uploadFile(certificate, 'certificates') : null;
-      const licenseUrl = license ? await uploadFile(license, 'licenses') : null;
+      // Upload files to Firebase Storage
+      const shopImageUrl = shopImage ? await uploadFile(shopImage, `shops/${user.uid}/${Date.now()}-shop.${shopImage.name.split('.').pop()}`) : null;
+      const certificateUrl = certificate ? await uploadFile(certificate, `certificates/${user.uid}/${Date.now()}-cert.${certificate.name.split('.').pop()}`) : null;
+      const licenseUrl = license ? await uploadFile(license, `licenses/${user.uid}/${Date.now()}-license.${license.name.split('.').pop()}`) : null;
 
       if (!shopImageUrl) {
         toast.error('Failed to upload shop image. Please try again.');
@@ -205,35 +185,33 @@ export default function AddShop() {
         reason?: string;
       } | null;
 
-      // Create shop with AI verification data
-      const { error } = await supabase.from('shops').insert({
-        owner_id: profile.id,
+      // Create shop in Firestore
+      await createShop({
+        ownerId: user.uid,
         name,
         description: description || null,
         address,
         latitude: latitude!,
         longitude: longitude!,
-        shop_image_url: shopImageUrl,
-        certificate_url: certificateUrl,
-        license_url: licenseUrl,
-        gst_number: gstNumber || null,
-        is_verified: false,
-        verification_status: 'pending',
-        ai_verification_status: aiResult?.isValid ? 'verified' : 'pending',
-        ai_verification_result: aiResult ? JSON.stringify({
-          confidence: aiResult.confidence,
-          reason: aiResult.reason,
-        }) : null,
-        ai_verified_at: aiResult?.isValid ? new Date().toISOString() : null,
+        shopImageUrl,
+        certificateUrl,
+        licenseUrl,
+        gstNumber: gstNumber || null,
+        tagline: null,
+        contactPhone: null,
+        contactEmail: null,
+        isVerified: false,
+        greenScore: 0,
+        verificationStatus: 'pending',
+        ownerVerified: false,
+        ownerVerifiedAt: null,
+        ownerVerifiedBy: null,
+        openingHours: null,
+        socialLinks: null,
       });
 
-      if (error) {
-        toast.error('Failed to register shop. Please try again.');
-        console.error(error);
-      } else {
-        toast.success('Shop registered successfully! AI verification complete.');
-        navigate('/dashboard');
-      }
+      toast.success('Shop registered successfully! AI verification complete.');
+      navigate('/dashboard');
     } catch (err) {
       toast.error('An unexpected error occurred');
       console.error(err);
@@ -443,14 +421,14 @@ export default function AddShop() {
 
               {/* License */}
               <div>
-                <Label>Trade License *</Label>
+                <Label>Trade License</Label>
                 <div className="mt-2">
                   <label className={`flex items-center justify-center gap-2 w-full h-12 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
-                    errors.license ? 'border-destructive' : license ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
+                    license ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
                   }`}>
-                    <Upload className={`h-5 w-5 ${license ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <CreditCard className={`h-5 w-5 ${license ? 'text-primary' : 'text-muted-foreground'}`} />
                     <span className={`text-sm ${license ? 'text-primary' : 'text-muted-foreground'}`}>
-                      {license ? license.name : 'Upload trade license'}
+                      {license ? license.name : 'Upload trade license (optional)'}
                     </span>
                     <input
                       type="file"
@@ -459,37 +437,35 @@ export default function AddShop() {
                       onChange={(e) => handleFileChange(e, 'license')}
                     />
                   </label>
-                  {errors.license && <p className="text-sm text-destructive mt-1">{errors.license}</p>}
                 </div>
               </div>
 
               {/* GST Number */}
               <div>
-                <Label htmlFor="gstNumber">GST Number (Optional)</Label>
-                <div className="relative mt-1">
-                  <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="gstNumber"
-                    value={gstNumber}
-                    onChange={(e) => setGstNumber(e.target.value)}
-                    placeholder="Enter GST number if applicable"
-                    className="pl-10"
-                  />
-                </div>
+                <Label htmlFor="gst">GST Number (Optional)</Label>
+                <Input
+                  id="gst"
+                  value={gstNumber}
+                  onChange={(e) => setGstNumber(e.target.value)}
+                  placeholder="Enter GST number if applicable"
+                />
               </div>
 
               {/* Submit */}
-              <Button type="submit" className="w-full" disabled={isSubmitting || isVerifying}>
+              <Button
+                type="submit"
+                className="w-full h-12 text-lg font-medium"
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-foreground" />
                 ) : (
-                  'Register Shop'
+                  <>
+                    <Sparkles className="h-5 w-5 mr-2" />
+                    Register Shop
+                  </>
                 )}
               </Button>
-
-              <p className="text-xs text-muted-foreground text-center">
-                AI verification provides instant feedback. Final verification within 24 hours.
-              </p>
             </form>
           </CardContent>
         </Card>

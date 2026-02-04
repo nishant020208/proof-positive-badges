@@ -1,21 +1,21 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
+import { useFirebaseUserRole } from '@/hooks/useFirebaseUserRole';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { NotificationBell } from '@/components/NotificationBell';
 import { 
   Leaf, Menu, Home, MapPin, Trophy, User, LayoutDashboard, 
-  Store, LogIn, LogOut, Shield, X, Plus, Package
+  Store, LogIn, LogOut, Shield, Plus
 } from 'lucide-react';
 
 export function MobileNav() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut } = useAuth();
-  const { role, isOwner, isShopOwner } = useUserRole();
+  const { user, signOut } = useFirebaseAuth();
+  const { isOwner, isShopOwner } = useFirebaseUserRole();
 
   const handleNavigate = (path: string) => {
     navigate(path);
