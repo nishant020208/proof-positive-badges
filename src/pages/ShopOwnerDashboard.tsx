@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+ import { useState, useEffect } from 'react';
+ import { useNavigate } from 'react-router-dom';
+ import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
+ import { collection, query, where, orderBy, limit, onSnapshot, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+ import { db } from '@/lib/firebase';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -69,7 +70,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export default function ShopOwnerDashboard() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+   const { user, profile } = useFirebaseAuth();
   const [shop, setShop] = useState<Shop | null>(null);
   const [badges, setBadges] = useState<ShopBadge[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
@@ -80,89 +81,116 @@ export default function ShopOwnerDashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!user || profile?.role !== 'shop_owner') {
+     if (!user || (profile?.role !== 'shop_owner')) {
       navigate('/');
       return;
     }
     fetchData();
-    setupRealtimeSubscription();
-  }, [user, profile, navigate]);
+   }, [user, profile]);
 
   const fetchData = async () => {
-    if (!profile?.id) return;
+     if (!user?.uid) return;
 
-    // Fetch shop
-    const { data: shopData } = await supabase
-      .from('shops')
-      .select('*')
-      .eq('owner_id', profile.id)
-      .single();
-
-    if (!shopData) {
+     try {
+       // Fetch shop
+       const shopQuery = query(
+         collection(db, 'shops'),
+         where('ownerId', '==', user.uid),
+         limit(1)
+       );
+       const shopSnapshot = await getDocs(shopQuery);
+       
+       if (shopSnapshot.empty) {
+         toast.error('No shop found for this account');
+         navigate('/add-shop');
+         return;
+       }
+ 
+       const shopDoc = shopSnapshot.docs[0];
+       const shopData = { id: shopDoc.id, ...shopDoc.data() } as any;
+       
+       setShop({
+         id: shopData.id,
+         name: shopData.name,
+         green_score: shopData.green_score || shopData.greenScore || 0,
+         is_verified: shopData.is_verified || shopData.isVerified || false,
+         ai_verification_status: shopData.ai_verification_status || shopData.aiVerificationStatus || 'pending',
+       });
+ 
+       // Fetch badges
+       const badgesQuery = query(
+         collection(db, 'shopBadges'),
+         where('shopId', '==', shopDoc.id)
+       );
+       const badgesSnapshot = await getDocs(badgesQuery);
+       
+       // Get badge definitions
+       const badgeDefsSnapshot = await getDocs(collection(db, 'badges'));
+       const badgeDefs = new Map(badgeDefsSnapshot.docs.map(d => [d.id, d.data()]));
+       
+       const badgesData = badgesSnapshot.docs.map(doc => {
+         const data = doc.data();
+         const badgeDef = badgeDefs.get(data.badgeId) || {};
+         return {
+           id: doc.id,
+           badge_id: data.badgeId,
+           yes_count: data.yesCount || 0,
+           no_count: data.noCount || 0,
+           percentage: data.percentage || 0,
+           level: data.level || 'none',
+           is_eligible: data.isEligible || false,
+           badge: {
+             name: (badgeDef as any).name || '',
+             description: (badgeDef as any).description || '',
+             category: (badgeDef as any).category || '',
+             icon: (badgeDef as any).icon || '🏷️',
+           },
+         };
+       });
+ 
+       setBadges(badgesData as ShopBadge[]);
+ 
+       // Fetch votes
+       const votesQuery = query(
+         collection(db, 'votes'),
+         where('shopId', '==', shopDoc.id),
+         orderBy('createdAt', 'desc'),
+         limit(50)
+       );
+       const votesSnapshot = await getDocs(votesQuery);
+       
+       const votesData = await Promise.all(votesSnapshot.docs.map(async doc => {
+         const data = doc.data();
+         const badgeDef = badgeDefs.get(data.badgeId) || {};
+         
+         // Get user profile
+         const userQuery = query(collection(db, 'users'), where('__name__', '==', data.userId));
+         const userSnap = await getDocs(userQuery);
+         const userData = userSnap.docs[0]?.data() || {};
+         
+         return {
+           id: doc.id,
+           vote_type: data.voteType,
+           created_at: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+           proof_image_url: data.proofImageUrl,
+           ai_verified: data.aiVerified,
+           ai_verification_result: data.aiVerificationResult,
+           badge: { name: (badgeDef as any).name || '' },
+           profile: { 
+             full_name: (userData as any).fullName || null,
+             email: (userData as any).email || '',
+           },
+           response: null,
+         };
+       }));
+ 
+       setVotes(votesData as Vote[]);
+       setLoading(false);
+     } catch (error) {
+       console.error('Error fetching data:', error);
       toast.error('No shop found for this account');
       navigate('/add-shop');
-      return;
     }
-
-    setShop(shopData as Shop);
-
-    // Fetch badges
-    const { data: badgesData } = await supabase
-      .from('shop_badges')
-      .select(`
-        *,
-        badge:badges(name, description, category, icon)
-      `)
-      .eq('shop_id', shopData.id);
-
-    setBadges((badgesData || []) as unknown as ShopBadge[]);
-
-    // Fetch votes with responses
-    const { data: votesData } = await supabase
-      .from('votes')
-      .select(`
-        *,
-        badge:badges(name),
-        profile:profiles!votes_user_id_fkey(full_name, email)
-      `)
-      .eq('shop_id', shopData.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    // Fetch responses separately
-    const { data: responsesData } = await supabase
-      .from('shop_responses')
-      .select('*')
-      .eq('shop_id', shopData.id);
-
-    const responsesMap = new Map(responsesData?.map(r => [r.vote_id, r]) || []);
-    
-    const votesWithResponses = (votesData || []).map(vote => ({
-      ...vote,
-      response: responsesMap.get(vote.id),
-    }));
-
-    setVotes(votesWithResponses as unknown as Vote[]);
-    setLoading(false);
-  };
-
-  const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel('shop-dashboard')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => {
-        fetchData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shop_badges' }, () => {
-        fetchData();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shops' }, () => {
-        fetchData();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   };
 
   const handleRespond = async () => {
@@ -170,15 +198,12 @@ export default function ShopOwnerDashboard() {
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('shop_responses')
-        .upsert({
-          shop_id: shop.id,
-          vote_id: selectedVote.id,
-          response_text: responseText.trim(),
-        });
-
-      if (error) throw error;
+       await addDoc(collection(db, 'shopResponses'), {
+         shopId: shop.id,
+         voteId: selectedVote.id,
+         responseText: responseText.trim(),
+         createdAt: serverTimestamp(),
+       });
 
       toast.success('Response submitted successfully');
       setSelectedVote(null);

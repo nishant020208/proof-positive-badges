@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+ import { useState, useEffect } from 'react';
+ import { collection, query, orderBy, onSnapshot, where, getDocs } from 'firebase/firestore';
+ import { db } from '@/lib/firebase';
 
 export interface Shop {
   id: string;
@@ -39,109 +40,132 @@ export interface BadgeDefinition {
   icon: string;
 }
 
-export function useShops() {
-  const [shops, setShops] = useState<Shop[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+ export function useShops() {
+   const [shops, setShops] = useState<Shop[]>([]);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState<Error | null>(null);
+ 
+   useEffect(() => {
+     const q = query(collection(db, 'shops'), orderBy('green_score', 'desc'));
+     
+     const unsubscribe = onSnapshot(q, 
+       (snapshot) => {
+         const shopsData = snapshot.docs.map(doc => ({
+           id: doc.id,
+           ...doc.data(),
+         })) as Shop[];
+         setShops(shopsData);
+         setLoading(false);
+       },
+       (err) => {
+         console.error('Error fetching shops:', err);
+         setError(err as Error);
+         setLoading(false);
+       }
+     );
+ 
+     return () => unsubscribe();
+   }, []);
+ 
+   const refetch = async () => {
+     setLoading(true);
+     const q = query(collection(db, 'shops'), orderBy('green_score', 'desc'));
+     const snapshot = await getDocs(q);
+     const shopsData = snapshot.docs.map(doc => ({
+       id: doc.id,
+       ...doc.data(),
+     })) as Shop[];
+     setShops(shopsData);
+     setLoading(false);
+   };
+ 
+   return { shops, loading, error, refetch };
+ }
 
-  const fetchShops = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('shops')
-      .select('*')
-      .order('green_score', { ascending: false });
-    
-    if (error) {
-      setError(error);
-    } else {
-      setShops(data as Shop[]);
-    }
-    setLoading(false);
-  };
+ export function useShopBadges(shopId: string | null) {
+   const [badges, setBadges] = useState<(ShopBadge & { badge: BadgeDefinition })[]>([]);
+   const [loading, setLoading] = useState(true);
+ 
+   useEffect(() => {
+     if (!shopId) {
+       setLoading(false);
+       return;
+     }
+ 
+     const fetchBadges = async () => {
+       setLoading(true);
+       
+       // Get all badge definitions
+       const badgesSnapshot = await getDocs(collection(db, 'badges'));
+       const badgeDefs = badgesSnapshot.docs.map(doc => ({
+         id: doc.id,
+         ...doc.data(),
+       })) as BadgeDefinition[];
+       
+       // Get shop badges
+       const shopBadgesQuery = query(
+         collection(db, 'shopBadges'),
+         where('shopId', '==', shopId)
+       );
+       const shopBadgesSnapshot = await getDocs(shopBadgesQuery);
+       const shopBadges = shopBadgesSnapshot.docs.map(doc => ({
+         id: doc.id,
+         ...doc.data(),
+       }));
+       
+       const combined = badgeDefs.map(badge => {
+         const shopBadge = shopBadges.find((sb: any) => sb.badgeId === badge.id);
+         return {
+           id: (shopBadge as any)?.id || `temp-${badge.id}`,
+           shop_id: shopId,
+           badge_id: badge.id,
+           yes_count: (shopBadge as any)?.yesCount || 0,
+           no_count: (shopBadge as any)?.noCount || 0,
+           percentage: (shopBadge as any)?.percentage || 0,
+           level: (shopBadge as any)?.level || 'none',
+           is_eligible: (shopBadge as any)?.isEligible || false,
+           badge: badge,
+         };
+       });
+       setBadges(combined);
+       setLoading(false);
+     };
+ 
+     fetchBadges();
+   }, [shopId]);
+ 
+   return { badges, loading };
+ }
 
-  useEffect(() => {
-    fetchShops();
-  }, []);
-
-  return { shops, loading, error, refetch: fetchShops };
-}
-
-export function useShopBadges(shopId: string | null) {
-  const [badges, setBadges] = useState<(ShopBadge & { badge: BadgeDefinition })[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!shopId) return;
-
-    const fetchBadges = async () => {
-      setLoading(true);
-      
-      // First get all badge definitions
-      const { data: badgeDefs } = await supabase
-        .from('badges')
-        .select('*');
-      
-      // Then get shop badges
-      const { data: shopBadges } = await supabase
-        .from('shop_badges')
-        .select('*')
-        .eq('shop_id', shopId);
-      
-      if (badgeDefs) {
-        const combined = badgeDefs.map(badge => {
-          const shopBadge = shopBadges?.find(sb => sb.badge_id === badge.id);
-          return {
-            id: shopBadge?.id || `temp-${badge.id}`,
-            shop_id: shopId,
-            badge_id: badge.id,
-            yes_count: shopBadge?.yes_count || 0,
-            no_count: shopBadge?.no_count || 0,
-            percentage: shopBadge?.percentage || 0,
-            level: shopBadge?.level || 'none',
-            is_eligible: shopBadge?.is_eligible || false,
-            badge: badge as BadgeDefinition,
-          };
-        });
-        setBadges(combined);
-      }
-      setLoading(false);
-    };
-
-    fetchBadges();
-  }, [shopId]);
-
-  return { badges, loading };
-}
-
-export function useUserVotes(userId: string | null, shopId: string | null) {
-  const [votes, setVotes] = useState<Record<string, 'yes' | 'no'>>({});
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!userId || !shopId) {
-      setLoading(false);
-      return;
-    }
-
-    const fetchVotes = async () => {
-      const { data } = await supabase
-        .from('votes')
-        .select('badge_id, vote_type')
-        .eq('user_id', userId)
-        .eq('shop_id', shopId);
-      
-      if (data) {
-        const voteMap: Record<string, 'yes' | 'no'> = {};
-        data.forEach(vote => {
-          voteMap[vote.badge_id] = vote.vote_type as 'yes' | 'no';
-        });
-        setVotes(voteMap);
-      }
-      setLoading(false);
-    };
-
-    fetchVotes();
-  }, [userId, shopId]);
-
-  return { votes, loading };
-}
+ export function useUserVotes(userId: string | null, shopId: string | null) {
+   const [votes, setVotes] = useState<Record<string, 'yes' | 'no'>>({});
+   const [loading, setLoading] = useState(true);
+ 
+   useEffect(() => {
+     if (!userId || !shopId) {
+       setLoading(false);
+       return;
+     }
+ 
+     const fetchVotes = async () => {
+       const votesQuery = query(
+         collection(db, 'votes'),
+         where('userId', '==', userId),
+         where('shopId', '==', shopId)
+       );
+       const snapshot = await getDocs(votesQuery);
+       
+       const voteMap: Record<string, 'yes' | 'no'> = {};
+       snapshot.docs.forEach(doc => {
+         const data = doc.data();
+         voteMap[data.badgeId] = data.voteType as 'yes' | 'no';
+       });
+       setVotes(voteMap);
+       setLoading(false);
+     };
+ 
+     fetchVotes();
+   }, [userId, shopId]);
+ 
+   return { votes, loading };
+ }

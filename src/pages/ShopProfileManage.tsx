@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+ import { useState, useEffect } from 'react';
+ import { useNavigate } from 'react-router-dom';
+ import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
+ import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+ import { db } from '@/lib/firebase';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -44,7 +45,7 @@ interface Product {
 
 export default function ShopProfileManage() {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+   const { user, profile } = useFirebaseAuth();
   
   const [shop, setShop] = useState<Shop | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -71,30 +72,61 @@ export default function ShopProfileManage() {
 
   useEffect(() => {
     fetchShopData();
-  }, [profile]);
+   }, [user]);
 
   const fetchShopData = async () => {
-    if (!profile?.id) return;
+     if (!user?.uid) return;
 
-    const { data: shopData } = await supabase
-      .from('shops')
-      .select('*')
-      .eq('owner_id', profile.id)
-      .single();
+     try {
+       const shopQuery = query(
+         collection(db, 'shops'),
+         where('ownerId', '==', user.uid)
+       );
+       const shopSnapshot = await getDocs(shopQuery);
 
-    if (shopData) {
-      setShop(shopData as Shop);
-      setTagline(shopData.tagline || '');
-      setDescription(shopData.description || '');
+       if (!shopSnapshot.empty) {
+         const shopDoc = shopSnapshot.docs[0];
+         const data = shopDoc.data();
+         const shopData = {
+           id: shopDoc.id,
+           name: data.name,
+           tagline: data.tagline || null,
+           description: data.description || null,
+           address: data.address,
+           shop_image_url: data.shopImageUrl || null,
+           owner_verified: data.ownerVerified || false,
+           green_score: data.greenScore || data.green_score || 0,
+         };
+         
+         setShop(shopData);
+         setTagline(shopData.tagline || '');
+         setDescription(shopData.description || '');
 
-      // Fetch products
-      const { data: productsData } = await supabase
-        .from('shop_products')
-        .select('*')
-        .eq('shop_id', shopData.id)
-        .order('created_at', { ascending: false });
+         // Fetch products
+         const productsQuery = query(
+           collection(db, 'shopProducts'),
+           where('shopId', '==', shopDoc.id),
+           orderBy('createdAt', 'desc')
+         );
+         const productsSnapshot = await getDocs(productsQuery);
+         const productsData = productsSnapshot.docs.map(d => ({
+           id: d.id,
+           name: d.data().name,
+           description: d.data().description || null,
+           price: d.data().price,
+           discounted_price: d.data().discountedPrice || null,
+           discount_percentage: d.data().discountPercentage || null,
+           category: d.data().category || null,
+           image_url: d.data().imageUrl || null,
+           is_eco_friendly: d.data().isEcoFriendly || false,
+           eco_tags: d.data().ecoTags || [],
+           is_available: d.data().isAvailable !== false,
+         }));
 
-      setProducts((productsData || []) as Product[]);
+         setProducts(productsData as Product[]);
+       }
+     } catch (error) {
+       console.error('Error fetching shop data:', error);
     }
 
     setLoading(false);
@@ -104,15 +136,15 @@ export default function ShopProfileManage() {
     if (!shop) return;
     setSaving(true);
 
-    const { error } = await supabase
-      .from('shops')
-      .update({ tagline, description })
-      .eq('id', shop.id);
-
-    if (error) {
+     try {
+       await updateDoc(doc(db, 'shops', shop.id), { 
+         tagline, 
+         description,
+         updatedAt: serverTimestamp(),
+       });
+       toast.success('Shop info updated!');
+     } catch (error) {
       toast.error('Failed to save changes');
-    } else {
-      toast.success('Shop info updated!');
     }
     setSaving(false);
   };
@@ -159,57 +191,50 @@ export default function ShopProfileManage() {
       : null;
 
     const productData = {
-      shop_id: shop.id,
+       shopId: shop.id,
       name: productForm.name,
       description: productForm.description || null,
       price,
-      discounted_price: discountedPrice,
-      discount_percentage: discountPercentage,
+       discountedPrice: discountedPrice,
+       discountPercentage: discountPercentage,
       category: productForm.category || null,
-      is_eco_friendly: productForm.is_eco_friendly,
-      eco_tags: productForm.eco_tags ? productForm.eco_tags.split(',').map(t => t.trim()) : [],
-      is_available: productForm.is_available,
+       isEcoFriendly: productForm.is_eco_friendly,
+       ecoTags: productForm.eco_tags ? productForm.eco_tags.split(',').map(t => t.trim()) : [],
+       isAvailable: productForm.is_available,
+       updatedAt: serverTimestamp(),
     };
 
     if (editingProduct) {
-      const { error } = await supabase
-        .from('shop_products')
-        .update(productData)
-        .eq('id', editingProduct.id);
-
-      if (error) {
+       try {
+         await updateDoc(doc(db, 'shopProducts', editingProduct.id), productData);
+         toast.success('Product updated!');
+         setProductDialog(false);
+         fetchShopData();
+       } catch (error) {
         toast.error('Failed to update product');
-      } else {
-        toast.success('Product updated!');
-        setProductDialog(false);
-        fetchShopData();
       }
     } else {
-      const { error } = await supabase
-        .from('shop_products')
-        .insert(productData);
-
-      if (error) {
+       try {
+         await addDoc(collection(db, 'shopProducts'), {
+           ...productData,
+           createdAt: serverTimestamp(),
+         });
+         toast.success('Product added!');
+         setProductDialog(false);
+         fetchShopData();
+       } catch (error) {
         toast.error('Failed to add product');
-      } else {
-        toast.success('Product added!');
-        setProductDialog(false);
-        fetchShopData();
       }
     }
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    const { error } = await supabase
-      .from('shop_products')
-      .delete()
-      .eq('id', productId);
-
-    if (error) {
+     try {
+       await deleteDoc(doc(db, 'shopProducts', productId));
+       toast.success('Product deleted');
+       fetchShopData();
+     } catch (error) {
       toast.error('Failed to delete product');
-    } else {
-      toast.success('Product deleted');
-      fetchShopData();
     }
   };
 

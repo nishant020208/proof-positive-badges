@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { useUserRole } from '@/hooks/useUserRole';
+ import { useState, useEffect } from 'react';
+ import { useNavigate } from 'react-router-dom';
+ import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
+ import { useFirebaseUserRole } from '@/hooks/useFirebaseUserRole';
+ import { collection, query, where, orderBy, getDocs, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+ import { db } from '@/lib/firebase';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -69,8 +70,8 @@ interface Appeal {
 
 export default function OwnerDashboard() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { isOwner, loading: roleLoading } = useUserRole();
+   const { user } = useFirebaseAuth();
+   const { isOwner, loading: roleLoading } = useFirebaseUserRole();
   
   const [pendingShops, setPendingShops] = useState<PendingShop[]>([]);
   const [pendingVotes, setPendingVotes] = useState<PendingVote[]>([]);
@@ -102,127 +103,156 @@ export default function OwnerDashboard() {
   const fetchData = async () => {
     setLoading(true);
     
-    // Fetch pending shops
-    const { data: shops } = await supabase
-      .from('shops')
-      .select(`
-        *,
-        profiles:owner_id(email, full_name)
-      `)
-      .eq('owner_verified', false)
-      .order('created_at', { ascending: false });
-
-    // Fetch pending votes  
-    const { data: votes } = await supabase
-      .from('votes')
-      .select(`
-        *,
-        shops:shop_id(name),
-        badges:badge_id(name)
-      `)
-      .is('owner_approved', null)
-      .order('created_at', { ascending: false });
-
-    // Fetch pending appeals
-    const { data: appeals } = await supabase
-      .from('appeals')
-      .select(`
-        *,
-        shops:shop_id(name),
-        votes:vote_id(badge_id, vote_type, proof_image_url, badges:badge_id(name))
-      `)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
-
-    // Fetch whitelist
-    const { data: whitelistData } = await supabase
-      .from('owner_whitelist')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    // Fetch stats
-    const { count: totalShops } = await supabase
-      .from('shops')
-      .select('*', { count: 'exact', head: true });
-    
-    const { count: verifiedShops } = await supabase
-      .from('shops')
-      .select('*', { count: 'exact', head: true })
-      .eq('owner_verified', true);
-
-    const { count: totalVotes } = await supabase
-      .from('votes')
-      .select('*', { count: 'exact', head: true });
-
-    setPendingShops((shops || []) as PendingShop[]);
-    setPendingVotes((votes || []) as PendingVote[]);
-    setPendingAppeals((appeals || []) as Appeal[]);
-    setWhitelist((whitelistData || []) as WhitelistEntry[]);
-    setStats({
-      totalShops: totalShops || 0,
-      verifiedShops: verifiedShops || 0,
-      pendingVotes: votes?.length || 0,
-      totalVotes: totalVotes || 0,
-      pendingAppeals: appeals?.length || 0,
-    });
-    setLoading(false);
+     try {
+       // Fetch pending shops
+       const shopsQuery = query(
+         collection(db, 'shops'),
+         where('ownerVerified', '==', false),
+         orderBy('createdAt', 'desc')
+       );
+       const shopsSnapshot = await getDocs(shopsQuery);
+       const shops = shopsSnapshot.docs.map(d => ({
+         id: d.id,
+         name: d.data().name,
+         address: d.data().address,
+         shop_image_url: d.data().shopImageUrl,
+         owner_id: d.data().ownerId,
+         created_at: d.data().createdAt?.toDate?.()?.toISOString() || '',
+         is_verified: d.data().isVerified || false,
+         owner_verified: d.data().ownerVerified || false,
+         ai_verification_status: d.data().aiVerificationStatus || 'pending',
+       }));
+ 
+       // Fetch pending votes
+       const votesQuery = query(
+         collection(db, 'votes'),
+         orderBy('createdAt', 'desc')
+       );
+       const votesSnapshot = await getDocs(votesQuery);
+       const allVotes = votesSnapshot.docs.map(d => ({
+         id: d.id,
+         ...d.data(),
+       }));
+       const pendingVotesData = allVotes.filter((v: any) => v.ownerApproved === null || v.ownerApproved === undefined);
+ 
+       // Get shop and badge info
+       const shopsMap = new Map(shopsSnapshot.docs.map(d => [d.id, d.data()]));
+       const badgesSnapshot = await getDocs(collection(db, 'badges'));
+       const badgesMap = new Map(badgesSnapshot.docs.map(d => [d.id, d.data()]));
+ 
+       const votes = pendingVotesData.map((v: any) => ({
+         id: v.id,
+         shop_id: v.shopId,
+         badge_id: v.badgeId,
+         vote_type: v.voteType,
+         proof_image_url: v.proofImageUrl,
+         ai_verified: v.aiVerified || false,
+         ai_confidence_score: v.aiConfidenceScore || 0,
+         owner_approved: v.ownerApproved,
+         created_at: v.createdAt?.toDate?.()?.toISOString() || '',
+         shops: { name: shopsMap.get(v.shopId)?.name || 'Unknown' },
+         badges: { name: badgesMap.get(v.badgeId)?.name || 'Unknown' },
+       }));
+ 
+       // Fetch pending appeals
+       const appealsQuery = query(
+         collection(db, 'appeals'),
+         where('status', '==', 'pending'),
+         orderBy('createdAt', 'desc')
+       );
+       const appealsSnapshot = await getDocs(appealsQuery);
+       const appeals = appealsSnapshot.docs.map(d => {
+         const data = d.data();
+         return {
+           id: d.id,
+           shop_id: data.shopId,
+           vote_id: data.voteId,
+           appeal_reason: data.appealReason,
+           evidence_url: data.evidenceUrl,
+           status: data.status,
+           created_at: data.createdAt?.toDate?.()?.toISOString() || '',
+           shops: { name: shopsMap.get(data.shopId)?.name || 'Unknown' },
+         };
+       });
+ 
+       // Fetch whitelist
+       const whitelistQuery = query(
+         collection(db, 'ownerWhitelist'),
+         orderBy('createdAt', 'desc')
+       );
+       const whitelistSnapshot = await getDocs(whitelistQuery);
+       const whitelistData = whitelistSnapshot.docs.map(d => ({
+         id: d.id,
+         email: d.data().email,
+         status: d.data().status,
+         created_at: d.data().createdAt?.toDate?.()?.toISOString() || '',
+       }));
+ 
+       // Stats
+       const allShopsSnapshot = await getDocs(collection(db, 'shops'));
+       const verifiedCount = allShopsSnapshot.docs.filter(d => d.data().ownerVerified === true).length;
+       const allVotesSnapshot = await getDocs(collection(db, 'votes'));
+ 
+       setPendingShops(shops as PendingShop[]);
+       setPendingVotes(votes as PendingVote[]);
+       setPendingAppeals(appeals as Appeal[]);
+       setWhitelist(whitelistData as WhitelistEntry[]);
+       setStats({
+         totalShops: allShopsSnapshot.size,
+         verifiedShops: verifiedCount,
+         pendingVotes: votes.length,
+         totalVotes: allVotesSnapshot.size,
+         pendingAppeals: appeals.length,
+       });
+     } catch (error) {
+       console.error('Error fetching data:', error);
+     }
+     setLoading(false);
   };
 
   const handleVerifyShop = async (shopId: string, verified: boolean) => {
-    const { error } = await supabase
-      .from('shops')
-      .update({
-        owner_verified: verified,
-        owner_verified_at: verified ? new Date().toISOString() : null,
-        owner_verified_by: verified ? user?.id : null,
-        is_verified: verified,
-        verification_status: verified ? 'verified' : 'rejected',
-      })
-      .eq('id', shopId);
-
-    if (error) {
+     try {
+       await updateDoc(doc(db, 'shops', shopId), {
+         ownerVerified: verified,
+         ownerVerifiedAt: verified ? serverTimestamp() : null,
+         ownerVerifiedBy: verified ? user?.uid : null,
+         isVerified: verified,
+         verificationStatus: verified ? 'verified' : 'rejected',
+       });
+       toast.success(verified ? 'Shop verified successfully!' : 'Shop rejected');
+       fetchData();
+     } catch (error) {
       toast.error('Failed to update shop');
-    } else {
-      toast.success(verified ? 'Shop verified successfully!' : 'Shop rejected');
-      fetchData();
     }
   };
 
   const handleApproveVote = async (voteId: string, approved: boolean, reason?: string) => {
-    const { error } = await supabase
-      .from('votes')
-      .update({
-        owner_approved: approved,
-        owner_approved_at: new Date().toISOString(),
-        owner_approved_by: user?.id,
-        owner_rejection_reason: approved ? null : reason,
-      })
-      .eq('id', voteId);
-
-    if (error) {
+     try {
+       await updateDoc(doc(db, 'votes', voteId), {
+         ownerApproved: approved,
+         ownerApprovedAt: serverTimestamp(),
+         ownerApprovedBy: user?.uid,
+         ownerRejectionReason: approved ? null : reason,
+       });
+       toast.success(approved ? 'Vote approved!' : 'Vote rejected');
+       fetchData();
+     } catch (error) {
       toast.error('Failed to update vote');
-    } else {
-      toast.success(approved ? 'Vote approved!' : 'Vote rejected');
-      fetchData();
     }
   };
 
   const handleResolveAppeal = async (appealId: string, approved: boolean, notes?: string) => {
-    const { error } = await supabase
-      .from('appeals')
-      .update({
-        status: approved ? 'approved' : 'rejected',
-        resolved_at: new Date().toISOString(),
-        resolved_by: user?.id,
-        resolution_notes: notes || (approved ? 'Appeal approved' : 'Appeal rejected'),
-      })
-      .eq('id', appealId);
-
-    if (error) {
+     try {
+       await updateDoc(doc(db, 'appeals', appealId), {
+         status: approved ? 'approved' : 'rejected',
+         resolvedAt: serverTimestamp(),
+         resolvedBy: user?.uid,
+         resolutionNotes: notes || (approved ? 'Appeal approved' : 'Appeal rejected'),
+       });
+       toast.success(approved ? 'Appeal approved - vote will be reviewed' : 'Appeal rejected');
+       fetchData();
+     } catch (error) {
       toast.error('Failed to resolve appeal');
-    } else {
-      toast.success(approved ? 'Appeal approved - vote will be reviewed' : 'Appeal rejected');
-      fetchData();
     }
   };
 
@@ -232,37 +262,32 @@ export default function OwnerDashboard() {
       return;
     }
 
-    const { error } = await supabase
-      .from('owner_whitelist')
-      .insert({
-        email: newEmail.toLowerCase(),
-        added_by: user?.id,
-      });
-
-    if (error) {
-      if (error.message.includes('duplicate')) {
-        toast.error('Email already whitelisted');
-      } else {
-        toast.error('Failed to add email');
-      }
-    } else {
+     try {
+       await addDoc(collection(db, 'ownerWhitelist'), {
+         email: newEmail.toLowerCase(),
+         addedBy: user?.uid,
+         status: 'pending',
+         createdAt: serverTimestamp(),
+       });
       toast.success('Email added to whitelist');
       setNewEmail('');
       fetchData();
+     } catch (error: any) {
+       if (error.message?.includes('duplicate')) {
+         toast.error('Email already whitelisted');
+       } else {
+         toast.error('Failed to add email');
+       }
     }
   };
 
   const handleRemoveFromWhitelist = async (id: string) => {
-    const { error } = await supabase
-      .from('owner_whitelist')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
+     try {
+       await deleteDoc(doc(db, 'ownerWhitelist', id));
+       toast.success('Email removed from whitelist');
+       fetchData();
+     } catch (error) {
       toast.error('Failed to remove email');
-    } else {
-      toast.success('Email removed from whitelist');
-      fetchData();
     }
   };
 
