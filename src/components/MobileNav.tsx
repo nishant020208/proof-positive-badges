@@ -29,8 +29,8 @@ export function MobileNav() {
       onClick={() => handleNavigate(path)}
       className={`flex items-center gap-3 w-full p-4 rounded-2xl transition-all ${
         isActive(path) 
-          ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' 
-          : 'hover:bg-accent text-foreground'
+          ? 'eco-gradient text-primary-foreground shadow-lg shadow-primary/25' 
+          : 'hover:bg-secondary text-foreground'
       }`}
     >
       <Icon className="h-5 w-5" />
@@ -47,34 +47,34 @@ export function MobileNav() {
             <Menu className="h-6 w-6" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-80 p-0 border-r-0">
-        <div className="flex flex-col h-full bg-gradient-to-b from-background to-accent/20">
+        <SheetContent side="left" className="w-80 p-0 border-r-0 bg-background">
+        <div className="flex flex-col h-full" style={{ background: 'linear-gradient(180deg, hsl(222, 47%, 9%) 0%, hsl(230, 40%, 5%) 100%)' }}>
           {/* Header */}
-          <SheetHeader className="p-6 pb-4 border-b border-border/50">
+          <SheetHeader className="p-6 pb-4" style={{ borderBottom: '1px solid hsla(142, 71%, 45%, 0.1)' }}>
             <div className="flex items-center gap-3">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/25">
+              <div className="p-3 rounded-2xl eco-gradient shadow-lg glow-eco">
                 <Leaf className="h-6 w-6 text-primary-foreground" />
               </div>
               <div>
-                <SheetTitle className="font-display text-xl font-bold">GreenScore</SheetTitle>
-                <p className="text-xs text-muted-foreground">Eco Verification Platform</p>
+                <SheetTitle className="font-vardant text-lg font-bold tracking-wider gradient-text">VARDANT</SheetTitle>
+                <p className="text-xs text-muted-foreground tracking-wide">Eco Verification</p>
               </div>
             </div>
           </SheetHeader>
 
           {/* User Info */}
           {user && (
-            <div className="p-4 mx-4 mt-4 rounded-2xl bg-card border border-border/50">
+            <div className="p-4 mx-4 mt-4 rounded-2xl glass-card">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                  <User className="h-5 w-5 text-primary" />
+                <div className="w-10 h-10 rounded-full flex items-center justify-center eco-gradient">
+                  <User className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{user.email}</p>
+                  <p className="text-sm font-medium truncate text-foreground">{user.email}</p>
                   <div className="flex items-center gap-1">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      isOwner ? 'bg-purple-500/20 text-purple-500' :
-                      isShopOwner ? 'bg-blue-500/20 text-blue-500' :
+                      isOwner ? 'bg-purple-500/20 text-purple-400' :
+                      isShopOwner ? 'bg-accent/20 text-accent' :
                       'bg-primary/20 text-primary'
                     }`}>
                       {isOwner ? 'Owner' : isShopOwner ? 'Shop Owner' : 'Customer'}
@@ -94,15 +94,13 @@ export function MobileNav() {
             {user && (
               <>
                 <div className="py-2">
-                  <p className="text-xs font-medium text-muted-foreground px-4 mb-2">MY ACCOUNT</p>
+                  <p className="text-xs font-medium text-muted-foreground px-4 mb-2 tracking-widest uppercase">My Account</p>
                 </div>
                 
-                {/* Customer items */}
                 {!isOwner && !isShopOwner && (
                   <NavItem path="/profile" icon={User} label="My Profile" />
                 )}
 
-                {/* Shop Owner items */}
                 {isShopOwner && (
                   <>
                     <NavItem path="/dashboard" icon={LayoutDashboard} label="Dashboard" />
@@ -111,11 +109,10 @@ export function MobileNav() {
                   </>
                 )}
 
-                {/* Owner items */}
                 {isOwner && (
                   <>
                     <div className="py-2">
-                      <p className="text-xs font-medium text-purple-500 px-4 mb-2">ADMIN</p>
+                      <p className="text-xs font-medium text-accent px-4 mb-2 tracking-widest uppercase">Admin</p>
                     </div>
                     <NavItem path="/owner-dashboard" icon={Shield} label="Admin Dashboard" />
                   </>
@@ -125,7 +122,7 @@ export function MobileNav() {
           </nav>
 
           {/* Footer */}
-          <div className="p-4 border-t border-border/50">
+          <div className="p-4" style={{ borderTop: '1px solid hsla(142, 71%, 45%, 0.1)' }}>
             {user ? (
               <Button
                 variant="ghost"
@@ -137,7 +134,7 @@ export function MobileNav() {
               </Button>
             ) : (
               <Button
-                className="w-full gap-2"
+                className="w-full gap-2 eco-gradient"
                 onClick={() => handleNavigate('/auth')}
               >
                 <LogIn className="h-5 w-5" />

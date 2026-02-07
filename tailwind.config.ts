@@ -16,6 +16,7 @@ export default {
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'sans-serif'],
         display: ['Space Grotesk', 'sans-serif'],
+        vardant: ['Orbitron', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -65,6 +66,10 @@ export default {
           gold: "hsl(var(--badge-gold))",
           none: "hsl(var(--badge-none))",
         },
+        neon: {
+          green: "#22c55e",
+          cyan: "#00f7ff",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -86,6 +91,9 @@ export default {
         'badge': 'var(--shadow-badge)',
         'glow-gold': 'var(--shadow-glow-gold)',
         'glow-eco': 'var(--shadow-glow-eco)',
+        'glow-cyan': 'var(--shadow-glow-cyan)',
+        'neon': 'var(--shadow-neon)',
+        'elevated': 'var(--shadow-elevated)',
       },
       keyframes: {
         "accordion-down": {
@@ -101,20 +109,30 @@ export default {
           "50%": { opacity: "0.7" },
         },
         "slide-up": {
-          from: { opacity: "0", transform: "translateY(10px)" },
+          from: { opacity: "0", transform: "translateY(20px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
         "scale-in": {
           from: { opacity: "0", transform: "scale(0.95)" },
           to: { opacity: "1", transform: "scale(1)" },
         },
+        "glow-pulse": {
+          "0%, 100%": { boxShadow: "0 0 10px hsla(142, 71%, 45%, 0.2)" },
+          "50%": { boxShadow: "0 0 30px hsla(142, 71%, 45%, 0.4)" },
+        },
+        "float": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-soft": "pulse-soft 2s ease-in-out infinite",
-        "slide-up": "slide-up 0.4s ease-out",
+        "slide-up": "slide-up 0.5s ease-out",
         "scale-in": "scale-in 0.3s ease-out",
+        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
+        "float": "float 4s ease-in-out infinite",
       },
     },
   },

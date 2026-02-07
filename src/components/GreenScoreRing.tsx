@@ -29,10 +29,17 @@ export function GreenScoreRing({ score, size = 'md', strokeWidth }: GreenScoreRi
   }, [score]);
 
   const getScoreColor = () => {
-    if (score >= 85) return 'hsl(45, 100%, 50%)'; // Gold
-    if (score >= 70) return 'hsl(0, 0%, 75%)'; // Silver
-    if (score >= 50) return 'hsl(30, 60%, 50%)'; // Bronze
-    return 'hsl(150, 10%, 70%)'; // None
+    if (score >= 85) return 'hsl(142, 71%, 45%)'; // Neon green
+    if (score >= 70) return 'hsl(183, 100%, 50%)'; // Cyan
+    if (score >= 50) return 'hsl(38, 95%, 50%)'; // Gold/warning
+    return 'hsl(0, 72%, 51%)'; // Red
+  };
+
+  const getGlowColor = () => {
+    if (score >= 85) return 'hsla(142, 71%, 45%, 0.5)';
+    if (score >= 70) return 'hsla(183, 100%, 50%, 0.4)';
+    if (score >= 50) return 'hsla(38, 95%, 50%, 0.4)';
+    return 'hsla(0, 72%, 51%, 0.3)';
   };
 
   const getScoreLabel = () => {
@@ -55,7 +62,7 @@ export function GreenScoreRing({ score, size = 'md', strokeWidth }: GreenScoreRi
           cy={numericSize / 2}
           r={radius}
           fill="none"
-          stroke="hsl(var(--muted))"
+          stroke="hsl(var(--secondary))"
           strokeWidth={actualStroke}
         />
         {/* Progress circle */}
@@ -71,7 +78,7 @@ export function GreenScoreRing({ score, size = 'md', strokeWidth }: GreenScoreRi
           strokeDashoffset={offset}
           className="transition-all duration-1000 ease-out"
           style={{
-            filter: score >= 85 ? 'drop-shadow(0 0 8px hsla(45, 100%, 50%, 0.5))' : 'none',
+            filter: `drop-shadow(0 0 8px ${getGlowColor()})`,
           }}
         />
       </svg>

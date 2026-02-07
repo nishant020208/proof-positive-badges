@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFirebaseAuth } from '@/hooks/useFirebaseAuth';
 import { getShops, Shop } from '@/lib/firestore';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { GreenScoreRing } from '@/components/GreenScoreRing';
 import { 
   Search, Leaf, MapPin, TrendingUp, Award, Users, 
-  CheckCircle, ArrowRight, Sparkles, Shield
+  CheckCircle, ArrowRight, Sparkles, Shield, Zap
 } from 'lucide-react';
 
 const Index = () => {
@@ -28,7 +28,6 @@ const Index = () => {
           .filter(s => s.isVerified)
           .sort((a, b) => (b.greenScore || 0) - (a.greenScore || 0));
         
-        // Get vote count
         const votesSnapshot = await getDocs(collection(db, 'votes'));
         
         setShops(verifiedShops);
@@ -54,33 +53,40 @@ const Index = () => {
   const otherShops = filteredShops.slice(3);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen vardant-bg">
       <AppHeader />
+
+      {/* Floating particles */}
+      <div className="particle" style={{ left: '5%' }} />
+      <div className="particle" />
+      <div className="particle" />
+      <div className="particle" />
+      <div className="particle" />
+      <div className="particle" />
       
       {/* Hero Section */}
-      <section className="relative overflow-hidden py-16 md:py-24">
-        {/* Background Effects */}
-        <div className="absolute inset-0 hero-pattern opacity-50" />
-        <div className="hero-glow top-0 left-1/4" />
-        <div className="hero-glow bottom-0 right-1/4 opacity-10" />
+      <section className="relative overflow-hidden py-20 md:py-28">
+        {/* Background orbs */}
+        <div className="hero-orb w-96 h-96 top-0 left-1/4 opacity-30" style={{ background: 'hsla(142, 71%, 45%, 0.15)' }} />
+        <div className="hero-orb w-72 h-72 bottom-0 right-1/4 opacity-20" style={{ background: 'hsla(183, 100%, 50%, 0.1)' }} />
         
         <div className="container relative">
           <div className="max-w-3xl mx-auto text-center space-y-6">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 text-primary" style={{ background: 'hsla(142, 71%, 45%, 0.08)' }}>
               <Sparkles className="w-4 h-4" />
               <span className="text-sm font-medium">AI-Powered Eco Verification</span>
             </div>
             
             {/* Headline */}
-            <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+            <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-foreground">
               Every Badge is{' '}
               <span className="gradient-text">Democracy</span>
               <br />
-              with <span className="relative">
+              with <span className="relative gradient-text-cyan">
                 Evidence
                 <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none">
-                  <path d="M2 10C40 4 100 2 198 8" stroke="hsl(var(--primary))" strokeWidth="3" strokeLinecap="round"/>
+                  <path d="M2 10C40 4 100 2 198 8" stroke="hsl(183, 100%, 50%)" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.6"/>
                 </svg>
               </span>
             </h1>
@@ -93,17 +99,17 @@ const Index = () => {
             
             {/* Search Bar */}
             <div className="relative max-w-lg mx-auto mt-8">
-              <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-xl" />
-              <div className="relative flex items-center bg-card border border-border/50 rounded-2xl overflow-hidden shadow-lg">
+              <div className="absolute inset-0 rounded-2xl blur-xl" style={{ background: 'hsla(142, 71%, 45%, 0.1)' }} />
+              <div className="relative flex items-center rounded-2xl overflow-hidden shadow-lg glass-card" style={{ padding: 0, border: '1px solid hsla(142, 71%, 45%, 0.15)' }}>
                 <Search className="absolute left-4 h-5 w-5 text-muted-foreground" />
                 <input
                   type="text"
                   placeholder="Search verified green shops..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-14 pl-12 pr-4 bg-transparent focus:outline-none"
+                  className="w-full h-14 pl-12 pr-4 bg-transparent focus:outline-none text-foreground placeholder:text-muted-foreground"
                 />
-                <Button className="m-2 h-10 px-6 rounded-xl">
+                <Button className="m-2 h-10 px-6 rounded-xl eco-gradient font-semibold">
                   Search
                 </Button>
               </div>
@@ -113,26 +119,26 @@ const Index = () => {
             <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
               <Button 
                 variant="outline" 
-                className="rounded-full gap-2"
+                className="rounded-full gap-2 border-primary/30 hover:bg-primary/10 hover:border-primary/50"
                 onClick={() => navigate('/map')}
               >
-                <MapPin className="h-4 w-4" />
+                <MapPin className="h-4 w-4 text-primary" />
                 Explore Map
               </Button>
               <Button 
                 variant="outline" 
-                className="rounded-full gap-2"
+                className="rounded-full gap-2 border-accent/30 hover:bg-accent/10 hover:border-accent/50"
                 onClick={() => navigate('/leaderboard')}
               >
-                <TrendingUp className="h-4 w-4" />
+                <TrendingUp className="h-4 w-4 text-accent" />
                 Leaderboard
               </Button>
               {!user && (
                 <Button 
-                  className="rounded-full gap-2"
+                  className="rounded-full gap-2 eco-gradient glow-eco"
                   onClick={() => navigate('/auth')}
                 >
-                  <Users className="h-4 w-4" />
+                  <Zap className="h-4 w-4" />
                   Join Now
                 </Button>
               )}
@@ -142,17 +148,19 @@ const Index = () => {
       </section>
 
       {/* Stats Section */}
-      <section className="py-8 border-y border-border/50 bg-card/30 backdrop-blur-sm">
+      <section className="py-8 border-y" style={{ borderColor: 'hsla(142, 71%, 45%, 0.1)', background: 'hsla(222, 40%, 10%, 0.3)' }}>
         <div className="container">
           <div className="grid grid-cols-3 gap-6 max-w-2xl mx-auto">
             {[
-              { value: stats.shops, label: 'Verified Shops', icon: CheckCircle },
-              { value: stats.badges, label: 'Eco Badges', icon: Award },
-              { value: stats.votes, label: 'Votes Cast', icon: Users },
+              { value: stats.shops, label: 'Verified Shops', icon: CheckCircle, color: 'primary' },
+              { value: stats.badges, label: 'Eco Badges', icon: Award, color: 'accent' },
+              { value: stats.votes, label: 'Votes Cast', icon: Users, color: 'primary' },
             ].map((stat, i) => (
-              <div key={i} className="text-center">
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 mb-2">
-                  <stat.icon className="h-5 w-5 text-primary" />
+              <div key={i} className="text-center animate-count" style={{ animationDelay: `${i * 0.15}s` }}>
+                <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl mb-2 ${
+                  stat.color === 'accent' ? 'bg-accent/10' : 'bg-primary/10'
+                }`}>
+                  <stat.icon className={`h-5 w-5 ${stat.color === 'accent' ? 'text-accent' : 'text-primary'}`} />
                 </div>
                 <p className="text-2xl md:text-3xl font-bold text-foreground">{stat.value}</p>
                 <p className="text-xs md:text-sm text-muted-foreground">{stat.label}</p>
@@ -162,16 +170,18 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Top Shops - Featured */}
+      {/* Top Shops */}
       {topShops.length > 0 && (
         <section className="py-12 md:py-16">
           <div className="container">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="font-display text-2xl md:text-3xl font-bold">Top Green Champions</h2>
+                <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground">
+                  Top <span className="gradient-text">Green Champions</span>
+                </h2>
                 <p className="text-muted-foreground mt-1">Highest rated eco-friendly shops</p>
               </div>
-              <Button variant="ghost" className="gap-2" onClick={() => navigate('/leaderboard')}>
+              <Button variant="ghost" className="gap-2 text-primary hover:bg-primary/10" onClick={() => navigate('/leaderboard')}>
                 View All <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
@@ -180,14 +190,17 @@ const Index = () => {
               {topShops.map((shop, index) => (
                 <div
                   key={shop.id}
-                  className="group relative glass-card card-hover cursor-pointer overflow-hidden"
+                  className={`group relative glass-card card-hover cursor-pointer overflow-hidden ${
+                    index === 0 ? 'rank-1' : ''
+                  }`}
                   onClick={() => navigate(`/shop/${shop.id}`)}
+                  style={{ animationDelay: `${index * 0.1}s` }}
                 >
                   {/* Rank Badge */}
-                  <div className={`absolute top-4 left-4 z-10 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-lg ${
-                    index === 0 ? 'gold-gradient' : 
-                    index === 1 ? 'bg-gradient-to-br from-slate-400 to-slate-500' : 
-                    'bg-gradient-to-br from-amber-600 to-orange-600'
+                  <div className={`absolute top-4 left-4 z-10 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-lg ${
+                    index === 0 ? 'badge-level-gold' : 
+                    index === 1 ? 'badge-level-silver' : 
+                    'badge-level-bronze'
                   }`}>
                     #{index + 1}
                   </div>
@@ -201,11 +214,11 @@ const Index = () => {
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                     ) : (
-                      <div className="w-full h-full eco-gradient-subtle flex items-center justify-center">
-                        <Leaf className="h-16 w-16 text-primary/30" />
+                      <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, hsla(142, 71%, 45%, 0.1), hsla(183, 100%, 50%, 0.05))' }}>
+                        <Leaf className="h-16 w-16 text-primary/20" />
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
                   </div>
 
                   {/* Content */}
@@ -213,17 +226,14 @@ const Index = () => {
                     <div className="flex items-end justify-between">
                       <div className="flex-1 min-w-0 pr-4">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-display font-semibold text-lg text-white truncate">
+                          <h3 className="font-display font-semibold text-lg text-foreground truncate">
                             {shop.name}
                           </h3>
                           {shop.isVerified && (
                             <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
                           )}
                         </div>
-                        <p className="text-sm text-white/70 truncate">{shop.address}</p>
-                        {shop.tagline && (
-                          <p className="text-xs text-white/50 mt-1 truncate">{shop.tagline}</p>
-                        )}
+                        <p className="text-sm text-muted-foreground truncate">{shop.address}</p>
                       </div>
                       <GreenScoreRing score={Math.round(Number(shop.greenScore) || 0)} size="md" />
                     </div>
@@ -237,15 +247,15 @@ const Index = () => {
 
       {/* Other Shops Grid */}
       {otherShops.length > 0 && (
-        <section className="py-12 bg-accent/30">
+        <section className="py-12" style={{ background: 'hsla(222, 40%, 8%, 0.5)' }}>
           <div className="container">
-            <h2 className="font-display text-xl md:text-2xl font-bold mb-6">All Verified Shops</h2>
+            <h2 className="font-display text-xl md:text-2xl font-bold mb-6 text-foreground">All Verified Shops</h2>
             
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {otherShops.map((shop) => (
                 <div
                   key={shop.id}
-                  className="group p-4 rounded-2xl border border-border/50 bg-card hover:bg-card/80 hover:border-primary/20 transition-all cursor-pointer"
+                  className="group glass-card p-4 cursor-pointer"
                   onClick={() => navigate(`/shop/${shop.id}`)}
                 >
                   <div className="flex items-start gap-4">
@@ -265,7 +275,7 @@ const Index = () => {
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <h3 className="font-semibold truncate">{shop.name}</h3>
+                        <h3 className="font-semibold truncate text-foreground">{shop.name}</h3>
                         {shop.isVerified && (
                           <CheckCircle className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                         )}
@@ -296,15 +306,15 @@ const Index = () => {
       {!loading && filteredShops.length === 0 && (
         <section className="py-20">
           <div className="container text-center">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6 glow-eco">
               <Leaf className="h-10 w-10 text-primary" />
             </div>
-            <h2 className="text-2xl font-bold mb-2">No Shops Found</h2>
+            <h2 className="text-2xl font-bold mb-2 text-foreground">No Shops Found</h2>
             <p className="text-muted-foreground mb-6">
               {searchQuery ? 'Try a different search term' : 'Be the first to add a green shop!'}
             </p>
             {user && (
-              <Button onClick={() => navigate('/add-shop')} className="gap-2">
+              <Button onClick={() => navigate('/add-shop')} className="gap-2 eco-gradient glow-eco">
                 <Leaf className="h-4 w-4" />
                 Add Your Shop
               </Button>
@@ -317,35 +327,34 @@ const Index = () => {
       {!user && (
         <section className="py-16 md:py-20">
           <div className="container">
-            <div className="relative overflow-hidden rounded-3xl eco-gradient p-8 md:p-12">
-              <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
+            <div className="relative overflow-hidden rounded-3xl p-8 md:p-12" style={{ background: 'linear-gradient(135deg, hsla(142, 71%, 45%, 0.15), hsla(183, 100%, 50%, 0.08))', border: '1px solid hsla(142, 71%, 45%, 0.15)' }}>
+              <div className="hero-orb w-64 h-64 -top-32 -right-32 opacity-40" style={{ background: 'hsla(142, 71%, 45%, 0.2)' }} />
               <div className="relative max-w-2xl mx-auto text-center">
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-white/90 mb-6">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-6">
                   <Shield className="w-4 h-4" />
                   <span className="text-sm font-medium">Join 500+ Eco Warriors</span>
                 </div>
                 
-                <h2 className="font-display text-3xl md:text-4xl font-bold text-white mb-4">
-                  Start Verifying Green Shops Today
+                <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
+                  Start Verifying <span className="gradient-text">Green Shops</span> Today
                 </h2>
-                <p className="text-white/80 mb-8 max-w-lg mx-auto">
+                <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
                   Your votes with photo proof help build transparent, eco-friendly commerce in your community.
                 </p>
                 
                 <div className="flex flex-wrap gap-4 justify-center">
                   <Button 
                     size="lg" 
-                    variant="secondary"
-                    className="gap-2 rounded-xl"
+                    className="gap-2 rounded-xl eco-gradient glow-eco"
                     onClick={() => navigate('/auth')}
                   >
-                    <Users className="h-5 w-5" />
+                    <Zap className="h-5 w-5" />
                     Create Account
                   </Button>
                   <Button 
                     size="lg" 
                     variant="outline"
-                    className="gap-2 rounded-xl bg-white/10 border-white/20 text-white hover:bg-white/20"
+                    className="gap-2 rounded-xl border-primary/30 hover:bg-primary/10"
                     onClick={() => navigate('/auth?role=shop_owner')}
                   >
                     I'm a Shop Owner
@@ -358,11 +367,11 @@ const Index = () => {
       )}
 
       {/* Footer */}
-      <footer className="py-8 border-t border-border/50">
+      <footer className="py-8" style={{ borderTop: '1px solid hsla(142, 71%, 45%, 0.1)' }}>
         <div className="container text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Leaf className="h-5 w-5 text-primary" />
-            <span className="font-display font-bold">GreenScore</span>
+            <span className="font-vardant font-bold tracking-wider gradient-text">VARDANT</span>
           </div>
           <p className="text-sm text-muted-foreground">
             Building a greener future, one verified shop at a time.

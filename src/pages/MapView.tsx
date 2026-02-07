@@ -1,50 +1,19 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import { useShops, Shop } from '@/hooks/useShops';
 import { AppHeader } from '@/components/AppHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { MapPin, Navigation, Leaf, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyAJSIfOUWlIafoqWjPLY36ZGTz_Y8GBtJo';
-
-const mapContainerStyle = {
-  width: '100%',
-  height: '100%',
-};
-
-const defaultCenter = { lat: 20.5937, lng: 78.9629 };
-
-const mapOptions: google.maps.MapOptions = {
-  disableDefaultUI: false,
-  zoomControl: true,
-  mapTypeControl: false,
-  streetViewControl: false,
-  fullscreenControl: true,
-  styles: [
-    {
-      featureType: 'poi',
-      elementType: 'labels',
-      stylers: [{ visibility: 'off' }],
-    },
-    {
-      featureType: 'water',
-      elementType: 'geometry.fill',
-      stylers: [{ color: '#c8e6f5' }],
-    },
-    {
-      featureType: 'landscape.natural',
-      elementType: 'geometry.fill',
-      stylers: [{ color: '#e8f5e9' }],
-    },
-  ],
-};
+const defaultCenter: [number, number] = [20.5937, 78.9629];
 
 function getScoreColor(score: number): string {
-  if (score >= 85) return '#16a34a'; // green
-  if (score >= 50) return '#eab308'; // yellow
-  return '#dc2626'; // red
+  if (score >= 85) return '#22c55e';
+  if (score >= 50) return '#eab308';
+  return '#ef4444';
 }
 
 function getGrade(score: number): string {
@@ -53,7 +22,7 @@ function getGrade(score: number): string {
   return 'C';
 }
 
-function createMarkerIcon(score: number): string {
+function createCustomIcon(score: number) {
   const color = getScoreColor(score);
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">
@@ -62,28 +31,56 @@ function createMarkerIcon(score: number): string {
       <text x="18" y="22" text-anchor="middle" font-size="11" font-weight="bold" fill="${color}">${Math.round(score)}</text>
     </svg>
   `;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [36, 46],
+    iconAnchor: [18, 46],
+    popupAnchor: [0, -46],
+  });
+}
+
+// Component to fit map bounds
+function FitBounds({ shops, userLocation }: { shops: Shop[]; userLocation: [number, number] | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (shops.length > 0) {
+      const bounds = L.latLngBounds(
+        shops.map(s => [s.latitude, s.longitude] as [number, number])
+      );
+      if (userLocation) bounds.extend(userLocation);
+      map.fitBounds(bounds, { padding: [40, 40] });
+    } else if (userLocation) {
+      map.setView(userLocation, 13);
+    }
+  }, [shops, userLocation, map]);
+
+  return null;
+}
+
+// Component to pan to selected shop
+function PanToShop({ shop }: { shop: Shop | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (shop) {
+      map.setView([shop.latitude, shop.longitude], 15, { animate: true });
+    }
+  }, [shop, map]);
+  return null;
 }
 
 export default function MapView() {
   const navigate = useNavigate();
   const { shops, loading } = useShops();
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-  });
 
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
+          setUserLocation([position.coords.latitude, position.coords.longitude]);
         },
         () => {
           setUserLocation(defaultCenter);
@@ -119,167 +116,117 @@ export default function MapView() {
     [userLocation]
   );
 
-  const onLoad = useCallback(
-    (mapInstance: google.maps.Map) => {
-      setMap(mapInstance);
-      if (verifiedShops.length > 0) {
-        const bounds = new google.maps.LatLngBounds();
-        if (userLocation) bounds.extend(userLocation);
-        verifiedShops.forEach((shop) =>
-          bounds.extend({ lat: shop.latitude, lng: shop.longitude })
-        );
-        mapInstance.fitBounds(bounds, 60);
-      }
-    },
-    [verifiedShops, userLocation]
-  );
-
-  const onUnmount = useCallback(() => setMap(null), []);
-
-  if (loadError) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-background to-accent/10">
-        <AppHeader />
-        <main className="container py-12 text-center">
-          <MapPin className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <p className="text-destructive font-medium">Failed to load Google Maps</p>
-          <p className="text-sm text-muted-foreground mt-1">Please check your connection and try again.</p>
-        </main>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-accent/10 flex flex-col">
+    <div className="min-h-screen vardant-bg flex flex-col">
       <AppHeader />
 
       <main className="flex-1 flex flex-col">
         {/* Map */}
         <div className="relative h-[55vh] md:h-[60vh] w-full">
-          {!isLoaded || loading ? (
-            <div className="h-full flex items-center justify-center bg-muted">
+          {loading ? (
+            <div className="h-full flex items-center justify-center bg-secondary/50">
               <div className="text-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">Loading map…</p>
               </div>
             </div>
           ) : (
-            <GoogleMap
-              mapContainerStyle={mapContainerStyle}
+            <MapContainer
               center={center}
               zoom={12}
-              options={mapOptions}
-              onLoad={onLoad}
-              onUnmount={onUnmount}
-              onClick={() => setSelectedShop(null)}
+              style={{ width: '100%', height: '100%' }}
+              zoomControl={true}
             >
-              {/* User location marker */}
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              />
+
+              <FitBounds shops={verifiedShops} userLocation={userLocation} />
+              <PanToShop shop={selectedShop} />
+
+              {/* User location */}
               {userLocation && (
-                <MarkerF
-                  position={userLocation}
-                  icon={{
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 8,
+                <CircleMarker
+                  center={userLocation}
+                  radius={8}
+                  pathOptions={{
+                    color: '#3b82f6',
                     fillColor: '#3b82f6',
                     fillOpacity: 1,
-                    strokeColor: '#ffffff',
-                    strokeWeight: 3,
+                    weight: 3,
                   }}
-                  title="Your Location"
-                  zIndex={999}
                 />
               )}
 
               {/* Shop markers */}
               {verifiedShops.map((shop) => (
-                <MarkerF
+                <Marker
                   key={shop.id}
-                  position={{ lat: shop.latitude, lng: shop.longitude }}
-                  icon={{
-                    url: createMarkerIcon(Number(shop.green_score)),
-                    scaledSize: new google.maps.Size(36, 46),
-                    anchor: new google.maps.Point(18, 46),
+                  position={[shop.latitude, shop.longitude]}
+                  icon={createCustomIcon(Number(shop.green_score))}
+                  eventHandlers={{
+                    click: () => setSelectedShop(shop),
                   }}
-                  onClick={() => setSelectedShop(shop)}
-                  zIndex={selectedShop?.id === shop.id ? 100 : 1}
-                />
-              ))}
-
-              {/* Info Window */}
-              {selectedShop && (
-                <InfoWindowF
-                  position={{
-                    lat: selectedShop.latitude,
-                    lng: selectedShop.longitude,
-                  }}
-                  onCloseClick={() => setSelectedShop(null)}
-                  options={{ pixelOffset: new google.maps.Size(0, -46) }}
                 >
-                  <div className="p-1 min-w-[200px]">
-                    <div className="flex items-center gap-3">
-                      {selectedShop.shop_image_url ? (
-                        <img
-                          src={selectedShop.shop_image_url}
-                          alt={selectedShop.name}
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
-                          <Leaf className="h-5 w-5 text-gray-400" />
+                  <Popup>
+                    <div className="min-w-[200px]">
+                      <div className="flex items-center gap-3">
+                        {shop.shop_image_url ? (
+                          <img
+                            src={shop.shop_image_url}
+                            alt={shop.name}
+                            className="w-12 h-12 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ background: 'hsla(142, 71%, 45%, 0.1)' }}>
+                            <Leaf className="h-5 w-5" style={{ color: 'hsl(142, 71%, 45%)' }} />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-sm truncate">{shop.name}</h3>
+                          <p className="text-xs opacity-70 truncate">{shop.address}</p>
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-sm text-gray-900 truncate">
-                          {selectedShop.name}
-                        </h3>
-                        <p className="text-xs text-gray-500 truncate">
-                          {selectedShop.address}
-                        </p>
                       </div>
-                    </div>
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold text-white"
-                          style={{
-                            backgroundColor: getScoreColor(
-                              Number(selectedShop.green_score)
-                            ),
-                          }}
-                        >
-                          {Math.round(Number(selectedShop.green_score))}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          Grade {getGrade(Number(selectedShop.green_score))}
-                        </span>
+                      <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid hsla(0,0%,100%,0.1)' }}>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold"
+                            style={{
+                              backgroundColor: getScoreColor(Number(shop.green_score)),
+                              color: '#fff',
+                            }}
+                          >
+                            {Math.round(Number(shop.green_score))}
+                          </span>
+                          <span className="text-xs opacity-60">
+                            Grade {getGrade(Number(shop.green_score))}
+                          </span>
+                        </div>
+                        {userLocation && (
+                          <span className="text-xs opacity-50">
+                            {calculateDistance(
+                              userLocation[0], userLocation[1],
+                              shop.latitude, shop.longitude
+                            ).toFixed(1)} km
+                          </span>
+                        )}
                       </div>
-                      {userLocation && (
-                        <span className="text-xs text-gray-400">
-                          {calculateDistance(
-                            userLocation.lat,
-                            userLocation.lng,
-                            selectedShop.latitude,
-                            selectedShop.longitude
-                          ).toFixed(1)}{' '}
-                          km
-                        </span>
-                      )}
+                      <button
+                        onClick={() => navigate(`/shop/${shop.id}`)}
+                        className="mt-2 w-full text-xs font-medium py-1.5 px-3 rounded-md"
+                        style={{
+                          backgroundColor: getScoreColor(Number(shop.green_score)),
+                          color: '#fff',
+                        }}
+                      >
+                        View Details →
+                      </button>
                     </div>
-                    <button
-                      onClick={() => navigate(`/shop/${selectedShop.id}`)}
-                      className="mt-2 w-full text-xs font-medium text-white py-1.5 px-3 rounded-md"
-                      style={{
-                        backgroundColor: getScoreColor(
-                          Number(selectedShop.green_score)
-                        ),
-                      }}
-                    >
-                      View Details →
-                    </button>
-                  </div>
-                </InfoWindowF>
-              )}
-            </GoogleMap>
+                  </Popup>
+                </Marker>
+              ))}
+            </MapContainer>
           )}
         </div>
 
@@ -287,7 +234,8 @@ export default function MapView() {
         <div className="container py-4 flex-1">
           <h2 className="font-display text-lg font-bold mb-3 flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
-            Nearby Shops ({verifiedShops.length})
+            <span className="gradient-text">Nearby Shops</span>
+            <span className="text-muted-foreground text-sm font-normal">({verifiedShops.length})</span>
           </h2>
 
           {verifiedShops.length === 0 && !loading ? (
@@ -301,28 +249,17 @@ export default function MapView() {
                 .map((shop) => ({
                   ...shop,
                   distance: userLocation
-                    ? calculateDistance(
-                        userLocation.lat,
-                        userLocation.lng,
-                        shop.latitude,
-                        shop.longitude
-                      )
+                    ? calculateDistance(userLocation[0], userLocation[1], shop.latitude, shop.longitude)
                     : 0,
                 }))
                 .sort((a, b) => a.distance - b.distance)
                 .map((shop) => (
                   <Card
                     key={shop.id}
-                    className={`cursor-pointer hover:shadow-md transition-all ${
-                      selectedShop?.id === shop.id
-                        ? 'ring-2 ring-primary shadow-md'
-                        : ''
+                    className={`cursor-pointer transition-all glass-card ${
+                      selectedShop?.id === shop.id ? 'neon-border-animate' : ''
                     }`}
-                    onClick={() => {
-                      setSelectedShop(shop);
-                      map?.panTo({ lat: shop.latitude, lng: shop.longitude });
-                      map?.setZoom(15);
-                    }}
+                    onClick={() => setSelectedShop(shop)}
                   >
                     <CardContent className="p-3">
                       <div className="flex items-center gap-3">
@@ -333,7 +270,7 @@ export default function MapView() {
                             className="w-11 h-11 rounded-lg object-cover flex-shrink-0"
                           />
                         ) : (
-                          <div className="w-11 h-11 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                          <div className="w-11 h-11 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
                             <Leaf className="h-5 w-5 text-muted-foreground" />
                           </div>
                         )}
@@ -349,11 +286,11 @@ export default function MapView() {
                           </div>
                         </div>
                         <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                           style={{
-                            backgroundColor: getScoreColor(
-                              Number(shop.green_score)
-                            ),
+                            backgroundColor: getScoreColor(Number(shop.green_score)),
+                            color: '#fff',
+                            boxShadow: `0 0 12px ${getScoreColor(Number(shop.green_score))}40`,
                           }}
                         >
                           {Math.round(Number(shop.green_score))}

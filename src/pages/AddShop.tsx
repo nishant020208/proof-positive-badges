@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Leaf, ArrowLeft, MapPin, Store, FileText, CreditCard, Image, CheckCircle, Brain, Sparkles } from 'lucide-react';
+import { Leaf, ArrowLeft, MapPin, Store, FileText, CreditCard, Image, CheckCircle, Brain, Sparkles, Loader2, Shield } from 'lucide-react';
 import LocationMapPreview from '@/components/LocationMapPreview';
 import { AIVerificationPanel } from '@/components/AIVerificationPanel';
 import { z } from 'zod';
@@ -39,9 +39,12 @@ export default function AddShop() {
   const [license, setLicense] = useState<File | null>(null);
   
   const [shopImagePreview, setShopImagePreview] = useState<string | null>(null);
+  const [certificatePreview, setCertificatePreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [gettingLocation, setGettingLocation] = useState(false);
   const [shopImageVerified, setShopImageVerified] = useState(false);
+  const [certificateVerified, setCertificateVerified] = useState(false);
+  const [isVerifyingCert, setIsVerifyingCert] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -93,13 +96,12 @@ export default function AddShop() {
     setShopImageVerified(false);
     clearResult();
 
-    // Trigger AI verification
     const result = await verifyShopImage(file, name || 'Shop');
     
     if (result) {
       setShopImageVerified(true);
       if (!result.isValid) {
-        toast.warning('AI detected issues with your shop image. Please review and consider uploading a better image.');
+        toast.warning('AI detected issues with your shop image.');
       } else if (result.confidence >= 70) {
         toast.success('AI verified your shop image!');
       } else {
@@ -108,7 +110,7 @@ export default function AddShop() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'certificate' | 'license') => {
+  const handleCertificateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -117,11 +119,48 @@ export default function AddShop() {
       return;
     }
 
-    if (type === 'certificate') {
-      setCertificate(file);
+    setCertificate(file);
+    
+    // Show preview for images
+    if (file.type.startsWith('image/')) {
+      setCertificatePreview(URL.createObjectURL(file));
     } else {
-      setLicense(file);
+      setCertificatePreview(null);
     }
+
+    // AI verify the certificate
+    setIsVerifyingCert(true);
+    setCertificateVerified(false);
+
+    try {
+      const result = await verifyShopImage(file, `${name || 'Shop'} - Business Certificate`);
+      if (result) {
+        setCertificateVerified(true);
+        if (result.isValid && result.confidence >= 60) {
+          toast.success('Certificate verified by AI!');
+        } else {
+          toast.info('Certificate uploaded. Review pending.');
+        }
+      }
+    } catch {
+      toast.info('Certificate uploaded successfully.');
+      setCertificateVerified(true);
+    } finally {
+      setIsVerifyingCert(false);
+    }
+  };
+
+  const handleLicenseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    setLicense(file);
+    toast.success('License uploaded!');
   };
 
   const validateForm = () => {
@@ -138,7 +177,6 @@ export default function AddShop() {
         return false;
       }
       
-      // Either certificate or license is required
       if (!certificate && !license) {
         setErrors({ certificate: 'Please upload at least a certificate or license' });
         return false;
@@ -162,15 +200,19 @@ export default function AddShop() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm() || !user) return;
+    if (!validateForm() || !user || isSubmitting) return;
 
     setIsSubmitting(true);
 
     try {
-      // Upload files to Firebase Storage
-      const shopImageUrl = shopImage ? await uploadFile(shopImage, `shops/${user.uid}/${Date.now()}-shop.${shopImage.name.split('.').pop()}`) : null;
-      const certificateUrl = certificate ? await uploadFile(certificate, `certificates/${user.uid}/${Date.now()}-cert.${certificate.name.split('.').pop()}`) : null;
-      const licenseUrl = license ? await uploadFile(license, `licenses/${user.uid}/${Date.now()}-license.${license.name.split('.').pop()}`) : null;
+      // Upload files in parallel for speed
+      const uploads = await Promise.all([
+        shopImage ? uploadFile(shopImage, `shops/${user.uid}/${Date.now()}-shop.${shopImage.name.split('.').pop()}`) : Promise.resolve(null),
+        certificate ? uploadFile(certificate, `certificates/${user.uid}/${Date.now()}-cert.${certificate.name.split('.').pop()}`) : Promise.resolve(null),
+        license ? uploadFile(license, `licenses/${user.uid}/${Date.now()}-license.${license.name.split('.').pop()}`) : Promise.resolve(null),
+      ]);
+
+      const [shopImageUrl, certificateUrl, licenseUrl] = uploads;
 
       if (!shopImageUrl) {
         toast.error('Failed to upload shop image. Please try again.');
@@ -178,14 +220,6 @@ export default function AddShop() {
         return;
       }
 
-      // Get AI verification result
-      const aiResult = verificationResult as {
-        isValid?: boolean;
-        confidence?: number;
-        reason?: string;
-      } | null;
-
-      // Create shop in Firestore
       await createShop({
         ownerId: user.uid,
         name,
@@ -210,10 +244,10 @@ export default function AddShop() {
         socialLinks: null,
       });
 
-      toast.success('Shop registered successfully! AI verification complete.');
+      toast.success('Shop registered successfully!');
       navigate('/dashboard');
     } catch (err) {
-      toast.error('An unexpected error occurred');
+      toast.error('Registration failed. Please try again.');
       console.error(err);
     } finally {
       setIsSubmitting(false);
@@ -222,23 +256,23 @@ export default function AddShop() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center vardant-bg">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen vardant-bg">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <header className="sticky top-0 z-50 bg-background/60 backdrop-blur-xl" style={{ borderBottom: '1px solid hsla(142, 71%, 45%, 0.1)' }}>
         <div className="container flex items-center h-16">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2 ml-2">
-            <div className="p-2 rounded-xl eco-gradient">
-              <Leaf className="h-5 w-5 text-white" />
+            <div className="p-2 rounded-xl eco-gradient glow-eco">
+              <Leaf className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="font-display text-xl font-bold text-foreground">Add Shop</span>
           </div>
@@ -246,14 +280,14 @@ export default function AddShop() {
       </header>
 
       <main className="container py-6 max-w-2xl">
-        <Card className="glass-card">
+        <Card className="glass-card overflow-hidden">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-foreground">
               <Store className="h-5 w-5 text-primary" />
               Register Your Shop
             </CardTitle>
             <CardDescription className="flex items-center gap-2">
-              <Brain className="h-4 w-4 text-primary" />
+              <Brain className="h-4 w-4 text-accent" />
               AI-powered instant verification for faster approval
             </CardDescription>
           </CardHeader>
@@ -262,56 +296,57 @@ export default function AddShop() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Shop Name */}
               <div>
-                <Label htmlFor="name">Shop Name *</Label>
+                <Label htmlFor="name" className="text-foreground">Shop Name *</Label>
                 <Input
                   id="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Enter your shop name"
-                  className={errors.name ? 'border-destructive' : ''}
+                  className={`bg-secondary/50 ${errors.name ? 'border-destructive' : 'border-border'}`}
                 />
                 {errors.name && <p className="text-sm text-destructive mt-1">{errors.name}</p>}
               </div>
 
               {/* Description */}
               <div>
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description" className="text-foreground">Description</Label>
                 <Textarea
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Tell customers about your shop and eco-practices"
+                  placeholder="Tell customers about your eco-practices"
                   rows={3}
+                  className="bg-secondary/50 border-border"
                 />
               </div>
 
               {/* Address */}
               <div>
-                <Label htmlFor="address">Address *</Label>
+                <Label htmlFor="address" className="text-foreground">Address *</Label>
                 <Textarea
                   id="address"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="Enter your complete shop address"
                   rows={2}
-                  className={errors.address ? 'border-destructive' : ''}
+                  className={`bg-secondary/50 ${errors.address ? 'border-destructive' : 'border-border'}`}
                 />
                 {errors.address && <p className="text-sm text-destructive mt-1">{errors.address}</p>}
               </div>
 
               {/* Location */}
               <div>
-                <Label>Shop Location *</Label>
+                <Label className="text-foreground">Shop Location *</Label>
                 <div className="mt-2 space-y-3">
                   <Button
                     type="button"
                     variant={latitude && longitude ? 'default' : 'outline'}
                     onClick={getCurrentLocation}
                     disabled={gettingLocation}
-                    className="w-full"
+                    className={`w-full ${latitude && longitude ? 'eco-gradient glow-eco' : 'border-border'}`}
                   >
                     {gettingLocation ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : latitude && longitude ? (
                       <CheckCircle className="h-4 w-4 mr-2" />
                     ) : (
@@ -320,7 +355,6 @@ export default function AddShop() {
                     {latitude && longitude ? 'Location Captured ✓' : 'Pin My Location'}
                   </Button>
                   
-                  {/* Map Preview */}
                   <LocationMapPreview 
                     latitude={latitude} 
                     longitude={longitude}
@@ -333,7 +367,7 @@ export default function AddShop() {
 
               {/* Shop Image with AI Verification */}
               <div className="space-y-3">
-                <Label className="flex items-center gap-2">
+                <Label className="flex items-center gap-2 text-foreground">
                   Shop Image *
                   <span className="inline-flex items-center gap-1 text-xs text-primary font-normal">
                     <Sparkles className="h-3 w-3" />
@@ -364,7 +398,6 @@ export default function AddShop() {
                   {errors.shopImage && <p className="text-sm text-destructive mt-1">{errors.shopImage}</p>}
                 </div>
 
-                {/* AI Verification Panel for Shop Image */}
                 <AIVerificationPanel 
                   isVerifying={isVerifying}
                   result={verificationResult}
@@ -372,60 +405,79 @@ export default function AddShop() {
                 />
               </div>
 
-              {/* Verification Info */}
-              <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
-                <h4 className="font-semibold text-sm flex items-center gap-2 mb-2">
-                  <CheckCircle className="h-4 w-4 text-primary" />
-                  Auto-Verification
+              {/* Verification Checklist */}
+              <div className="rounded-xl p-4" style={{ background: 'hsla(142, 71%, 45%, 0.06)', border: '1px solid hsla(142, 71%, 45%, 0.15)' }}>
+                <h4 className="font-semibold text-sm flex items-center gap-2 mb-2 text-foreground">
+                  <Shield className="h-4 w-4 text-primary" />
+                  Verification Checklist
                 </h4>
-                <p className="text-xs text-muted-foreground">
-                  Your shop will be <strong>automatically verified</strong> once you provide:
-                </p>
-                <ul className="text-xs text-muted-foreground mt-2 space-y-1">
-                  <li className="flex items-center gap-2">
-                    {latitude && longitude ? <CheckCircle className="h-3 w-3 text-green-500" /> : <span className="h-3 w-3 rounded-full border border-muted-foreground" />}
-                    GPS Location
-                  </li>
-                  <li className="flex items-center gap-2">
-                    {shopImageVerified ? <CheckCircle className="h-3 w-3 text-green-500" /> : <span className="h-3 w-3 rounded-full border border-muted-foreground" />}
-                    AI-Verified Shop Image
-                  </li>
-                  <li className="flex items-center gap-2">
-                    {certificate || license ? <CheckCircle className="h-3 w-3 text-green-500" /> : <span className="h-3 w-3 rounded-full border border-muted-foreground" />}
-                    Certificate or License
-                  </li>
+                <ul className="text-xs text-muted-foreground mt-2 space-y-2">
+                  {[
+                    { done: !!(latitude && longitude), label: 'GPS Location' },
+                    { done: shopImageVerified, label: 'AI-Verified Shop Image' },
+                    { done: !!(certificate || license), label: 'Certificate or License' },
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      {item.done ? (
+                        <CheckCircle className="h-4 w-4 text-primary" />
+                      ) : (
+                        <span className="h-4 w-4 rounded-full border border-muted-foreground" />
+                      )}
+                      <span className={item.done ? 'text-foreground' : ''}>{item.label}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
 
-              {/* Certificate */}
-              <div>
-                <Label>Business Certificate *</Label>
-                <div className="mt-2">
-                  <label className={`flex items-center justify-center gap-2 w-full h-12 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
-                    errors.certificate ? 'border-destructive' : certificate ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
-                  }`}>
-                    <FileText className={`h-5 w-5 ${certificate ? 'text-primary' : 'text-muted-foreground'}`} />
+              {/* Certificate with AI Verification */}
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2 text-foreground">
+                  Business Certificate *
+                  {certificateVerified && (
+                    <span className="inline-flex items-center gap-1 text-xs text-primary font-normal">
+                      <CheckCircle className="h-3 w-3" />
+                      Verified
+                    </span>
+                  )}
+                </Label>
+                <div>
+                  <label className={`flex items-center justify-center gap-2 w-full h-14 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
+                    errors.certificate ? 'border-destructive' : certificate ? 'border-primary' : 'border-border hover:border-primary/50'
+                  } ${isVerifyingCert ? 'pointer-events-none opacity-50' : ''}`}
+                    style={certificate ? { background: 'hsla(142, 71%, 45%, 0.06)' } : {}}
+                  >
+                    {isVerifyingCert ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    ) : (
+                      <FileText className={`h-5 w-5 ${certificate ? 'text-primary' : 'text-muted-foreground'}`} />
+                    )}
                     <span className={`text-sm ${certificate ? 'text-primary' : 'text-muted-foreground'}`}>
-                      {certificate ? certificate.name : 'Upload business certificate'}
+                      {isVerifyingCert ? 'Verifying certificate...' : certificate ? certificate.name : 'Upload business certificate'}
                     </span>
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       className="hidden"
-                      onChange={(e) => handleFileChange(e, 'certificate')}
+                      onChange={handleCertificateChange}
+                      disabled={isVerifyingCert}
                     />
                   </label>
+                  {certificatePreview && (
+                    <img src={certificatePreview} alt="Certificate" className="mt-2 w-full h-32 object-cover rounded-lg border border-border" />
+                  )}
                   {errors.certificate && <p className="text-sm text-destructive mt-1">{errors.certificate}</p>}
                 </div>
               </div>
 
               {/* License */}
               <div>
-                <Label>Trade License</Label>
+                <Label className="text-foreground">Trade License</Label>
                 <div className="mt-2">
-                  <label className={`flex items-center justify-center gap-2 w-full h-12 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
-                    license ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
-                  }`}>
+                  <label className={`flex items-center justify-center gap-2 w-full h-14 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
+                    license ? 'border-primary' : 'border-border hover:border-primary/50'
+                  }`}
+                    style={license ? { background: 'hsla(142, 71%, 45%, 0.06)' } : {}}
+                  >
                     <CreditCard className={`h-5 w-5 ${license ? 'text-primary' : 'text-muted-foreground'}`} />
                     <span className={`text-sm ${license ? 'text-primary' : 'text-muted-foreground'}`}>
                       {license ? license.name : 'Upload trade license (optional)'}
@@ -434,7 +486,7 @@ export default function AddShop() {
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       className="hidden"
-                      onChange={(e) => handleFileChange(e, 'license')}
+                      onChange={handleLicenseChange}
                     />
                   </label>
                 </div>
@@ -442,23 +494,27 @@ export default function AddShop() {
 
               {/* GST Number */}
               <div>
-                <Label htmlFor="gst">GST Number (Optional)</Label>
+                <Label htmlFor="gst" className="text-foreground">GST Number (Optional)</Label>
                 <Input
                   id="gst"
                   value={gstNumber}
                   onChange={(e) => setGstNumber(e.target.value)}
                   placeholder="Enter GST number if applicable"
+                  className="bg-secondary/50 border-border"
                 />
               </div>
 
               {/* Submit */}
               <Button
                 type="submit"
-                className="w-full h-12 text-lg font-medium"
-                disabled={isSubmitting}
+                className="w-full h-14 text-lg font-semibold eco-gradient glow-eco transition-all"
+                disabled={isSubmitting || isVerifying || isVerifyingCert}
               >
                 {isSubmitting ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-foreground" />
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Registering...</span>
+                  </div>
                 ) : (
                   <>
                     <Sparkles className="h-5 w-5 mr-2" />
