@@ -21,7 +21,7 @@ export function DesktopNav() {
       variant={isActive(path) ? 'default' : 'ghost'}
       size="sm"
       onClick={() => navigate(path)}
-      className={`gap-2 ${isActive(path) ? 'shadow-md' : ''}`}
+      className={`gap-2 transition-all ${isActive(path) ? 'eco-gradient shadow-md glow-eco' : 'hover:bg-secondary'}`}
     >
       <Icon className="h-4 w-4" />
       <span className="hidden lg:inline">{label}</span>
@@ -36,29 +36,26 @@ export function DesktopNav() {
 
       {user && (
         <>
-          {/* Customer items */}
           {!isOwner && !isShopOwner && (
             <NavButton path="/profile" icon={User} label="Profile" />
           )}
 
-          {/* Shop Owner items */}
           {isShopOwner && (
             <>
               <NavButton path="/dashboard" icon={LayoutDashboard} label="Dashboard" />
               <NavButton path="/shop-profile" icon={Store} label="Shop" />
-              <Button size="sm" onClick={() => navigate('/add-shop')} className="gap-2 bg-primary">
+              <Button size="sm" onClick={() => navigate('/add-shop')} className="gap-2 eco-gradient glow-eco">
                 <Plus className="h-4 w-4" />
                 <span className="hidden lg:inline">Add Shop</span>
               </Button>
             </>
           )}
 
-          {/* Owner items */}
           {isOwner && (
             <Button
               size="sm"
               onClick={() => navigate('/owner-dashboard')}
-              className="gap-2 bg-purple-600 hover:bg-purple-700 text-white"
+              className="gap-2 bg-secondary text-accent shadow-lg border border-accent/30 hover:bg-accent/10"
             >
               <Shield className="h-4 w-4" />
               <span className="hidden lg:inline">Admin</span>
@@ -82,7 +79,7 @@ export function DesktopNav() {
           <span className="hidden lg:inline">Logout</span>
         </Button>
       ) : (
-        <Button size="sm" onClick={() => navigate('/auth')} className="gap-2">
+        <Button size="sm" onClick={() => navigate('/auth')} className="gap-2 eco-gradient glow-eco">
           <LogIn className="h-4 w-4" />
           Sign In
         </Button>

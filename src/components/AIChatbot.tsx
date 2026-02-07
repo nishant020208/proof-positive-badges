@@ -15,10 +15,10 @@ interface Message {
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/greenscore-chat`;
 
 const SUGGESTED_QUESTIONS = [
-  { label: '🏅 How do badges work?', message: 'How do badges work in GreenScore?' },
-  { label: '📊 Score calculation', message: 'How is the Green Score calculated?' },
+  { label: '🏅 Badges', message: 'How do badges work in GreenScore?' },
+  { label: '📊 Score', message: 'How is the Green Score calculated?' },
   { label: '🌱 Eco tips', message: 'What eco-friendly practices can shops adopt?' },
-  { label: '🏪 Shop verification', message: 'How does shop verification work?' },
+  { label: '🏪 Verification', message: 'How does shop verification work?' },
 ];
 
 export function AIChatbot() {
@@ -60,12 +60,8 @@ export function AIChatbot() {
       });
 
       if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Rate limited. Please try again later.');
-        }
-        if (response.status === 402) {
-          throw new Error('Service temporarily unavailable.');
-        }
+        if (response.status === 429) throw new Error('Rate limited. Please try again later.');
+        if (response.status === 402) throw new Error('Service temporarily unavailable.');
         throw new Error('Failed to get response');
       }
 
@@ -117,7 +113,7 @@ export function AIChatbot() {
     } catch (error: any) {
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: error.message || 'Sorry, something went wrong. Please try again.' }
+        { role: 'assistant', content: error.message || 'Sorry, something went wrong.' }
       ]);
     } finally {
       setIsLoading(false);
@@ -135,7 +131,7 @@ export function AIChatbot() {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 z-50"
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl eco-gradient glow-eco z-50 animate-glow-pulse"
         size="icon"
       >
         <MessageCircle className="h-6 w-6" />
@@ -144,16 +140,16 @@ export function AIChatbot() {
   }
 
   return (
-    <Card className="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-[380px] h-[480px] sm:h-[520px] flex flex-col shadow-2xl border-border/50 z-50 overflow-hidden">
+    <Card className="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-[380px] h-[480px] sm:h-[520px] flex flex-col shadow-2xl z-50 overflow-hidden glass-card" style={{ border: '1px solid hsla(142, 71%, 45%, 0.15)' }}>
       {/* Header */}
-      <div className="p-4 border-b border-border/50 bg-gradient-to-r from-primary/10 to-accent/10">
+      <div className="p-4" style={{ borderBottom: '1px solid hsla(142, 71%, 45%, 0.1)', background: 'hsla(142, 71%, 45%, 0.05)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-primary/20">
-              <Leaf className="h-5 w-5 text-primary" />
+            <div className="p-2 rounded-xl eco-gradient glow-eco">
+              <Leaf className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground">GreenScore AI</h3>
+              <h3 className="font-semibold text-foreground font-vardant text-sm tracking-wider">VARDANT AI</h3>
               <p className="text-xs text-muted-foreground">Your eco assistant</p>
             </div>
           </div>
@@ -169,14 +165,14 @@ export function AIChatbot() {
           <div className="text-center py-6">
             <Bot className="h-12 w-12 text-primary/50 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground mb-4">
-              Hi! I'm your GreenScore assistant. Try asking:
+              Ask me anything about VARDANT:
             </p>
             <div className="flex flex-wrap gap-2 justify-center">
               {SUGGESTED_QUESTIONS.map((sq) => (
                 <button
                   key={sq.label}
                   onClick={() => sendMessage(sq.message)}
-                  className="text-xs px-3 py-2 rounded-full border border-border bg-card hover:bg-accent transition-colors text-foreground"
+                  className="text-xs px-3 py-2 rounded-full border border-border bg-secondary/50 hover:bg-primary/10 hover:border-primary/30 transition-colors text-foreground"
                 >
                   {sq.label}
                 </button>
@@ -191,19 +187,19 @@ export function AIChatbot() {
                 className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {msg.role === 'assistant' && (
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                    <Bot className="h-4 w-4 text-primary" />
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 eco-gradient">
+                    <Bot className="h-4 w-4 text-primary-foreground" />
                   </div>
                 )}
                 <div
                   className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${
                     msg.role === 'user'
-                      ? 'bg-primary text-primary-foreground rounded-br-md'
-                      : 'bg-muted text-foreground rounded-bl-md'
+                      ? 'eco-gradient text-primary-foreground rounded-br-md'
+                      : 'bg-secondary text-foreground rounded-bl-md'
                   }`}
                 >
                   {msg.role === 'assistant' ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <div className="prose prose-sm prose-invert max-w-none">
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
                   ) : (
@@ -211,7 +207,7 @@ export function AIChatbot() {
                   )}
                 </div>
                 {msg.role === 'user' && (
-                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full eco-gradient flex items-center justify-center flex-shrink-0">
                     <User className="h-4 w-4 text-primary-foreground" />
                   </div>
                 )}
@@ -219,11 +215,11 @@ export function AIChatbot() {
             ))}
             {isLoading && messages[messages.length - 1]?.role === 'user' && (
               <div className="flex gap-3 justify-start">
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-primary" />
+                <div className="w-8 h-8 rounded-full flex items-center justify-center eco-gradient">
+                  <Bot className="h-4 w-4 text-primary-foreground" />
                 </div>
-                <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <div className="bg-secondary rounded-2xl rounded-bl-md px-4 py-3">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
                 </div>
               </div>
             )}
@@ -231,14 +227,14 @@ export function AIChatbot() {
         )}
       </ScrollArea>
 
-      {/* Suggested follow-ups after conversation starts */}
+      {/* Suggested follow-ups */}
       {messages.length > 0 && !isLoading && (
         <div className="px-4 pb-2 flex gap-2 overflow-x-auto">
           {SUGGESTED_QUESTIONS.slice(0, 2).map((sq) => (
             <button
               key={sq.label}
               onClick={() => sendMessage(sq.message)}
-              className="text-[10px] px-2 py-1 rounded-full border border-border bg-card hover:bg-accent transition-colors text-muted-foreground whitespace-nowrap flex-shrink-0"
+              className="text-[10px] px-2 py-1 rounded-full border border-border bg-secondary/50 hover:bg-primary/10 transition-colors text-muted-foreground whitespace-nowrap flex-shrink-0"
             >
               {sq.label}
             </button>
@@ -247,7 +243,7 @@ export function AIChatbot() {
       )}
 
       {/* Input */}
-      <div className="p-4 border-t border-border/50">
+      <div className="p-4" style={{ borderTop: '1px solid hsla(142, 71%, 45%, 0.1)' }}>
         <div className="flex gap-2">
           <Input
             value={input}
@@ -255,9 +251,9 @@ export function AIChatbot() {
             onKeyDown={handleKeyPress}
             placeholder="Ask about eco-practices..."
             disabled={isLoading}
-            className="flex-1"
+            className="flex-1 bg-secondary/50 border-border"
           />
-          <Button onClick={() => sendMessage()} disabled={isLoading || !input.trim()} size="icon">
+          <Button onClick={() => sendMessage()} disabled={isLoading || !input.trim()} size="icon" className="eco-gradient">
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
