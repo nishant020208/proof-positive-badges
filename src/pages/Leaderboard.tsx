@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useShops } from '@/hooks/useShops';
 import { AppHeader } from '@/components/AppHeader';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Trophy, Medal, Award, Search, MapPin, Leaf, Crown } from 'lucide-react';
+import { AnimatedCounter } from '@/components/AnimatedCounter';
+import { ScrollReveal } from '@/components/ScrollReveal';
+import { Trophy, Medal, Award, Search, MapPin, Leaf, Crown, ArrowUpDown, SortAsc } from 'lucide-react';
 
 function getRankIcon(rank: number) {
   switch (rank) {
@@ -75,20 +77,24 @@ export default function Leaderboard() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          {[
-            { value: filteredAndSortedShops.length, label: 'Verified Shops', glow: 'primary' },
-            { value: filteredAndSortedShops.filter(s => Number(s.green_score) >= 85).length, label: 'A+ Rated', glow: 'gold' },
-            { value: Math.round(filteredAndSortedShops.reduce((sum, s) => sum + Number(s.green_score), 0) / Math.max(filteredAndSortedShops.length, 1)), label: 'Avg Score', glow: 'accent' },
-          ].map((stat, i) => (
-            <Card key={i} className="text-center p-4 glass-card">
-              <div className={`text-2xl font-bold ${
-                stat.glow === 'gold' ? 'text-warning' : stat.glow === 'accent' ? 'text-accent' : 'text-primary'
-              }`}>{stat.value}</div>
-              <div className="text-xs text-muted-foreground">{stat.label}</div>
-            </Card>
-          ))}
-        </div>
+        <ScrollReveal>
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            {[
+              { value: filteredAndSortedShops.length, label: 'Verified Shops', glow: 'primary' },
+              { value: filteredAndSortedShops.filter(s => Number(s.green_score) >= 85).length, label: 'A+ Rated', glow: 'gold' },
+              { value: Math.round(filteredAndSortedShops.reduce((sum, s) => sum + Number(s.green_score), 0) / Math.max(filteredAndSortedShops.length, 1)), label: 'Avg Score', glow: 'accent' },
+            ].map((stat, i) => (
+              <Card key={i} className="text-center p-4 glass-card stat-card">
+                <div className={`text-2xl font-bold ${
+                  stat.glow === 'gold' ? 'text-warning' : stat.glow === 'accent' ? 'text-accent' : 'text-primary'
+                }`}>
+                  <AnimatedCounter value={stat.value} duration={1200 + i * 200} />
+                </div>
+                <div className="text-xs text-muted-foreground">{stat.label}</div>
+              </Card>
+            ))}
+          </div>
+        </ScrollReveal>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -101,15 +107,26 @@ export default function Leaderboard() {
               className="pl-10 bg-secondary/50 border-border"
             />
           </div>
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'score' | 'name')}>
-            <SelectTrigger className="w-full sm:w-40 bg-secondary/50">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="score">Highest Score</SelectItem>
-              <SelectItem value="name">Name A-Z</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Button
+              variant={sortBy === 'score' ? 'default' : 'outline'}
+              size="sm"
+              className={sortBy === 'score' ? 'eco-gradient' : 'border-border'}
+              onClick={() => setSortBy('score')}
+            >
+              <ArrowUpDown className="h-3.5 w-3.5 mr-1.5" />
+              Score
+            </Button>
+            <Button
+              variant={sortBy === 'name' ? 'default' : 'outline'}
+              size="sm"
+              className={sortBy === 'name' ? 'eco-gradient' : 'border-border'}
+              onClick={() => setSortBy('name')}
+            >
+              <SortAsc className="h-3.5 w-3.5 mr-1.5" />
+              Name
+            </Button>
+          </div>
         </div>
 
         {/* Leaderboard */}
@@ -125,63 +142,64 @@ export default function Leaderboard() {
         ) : (
           <div className="space-y-3">
             {filteredAndSortedShops.map((shop, index) => (
-              <Card
-                key={shop.id}
-                className={`cursor-pointer transition-all glass-card ${
-                  index < 3 ? 'neon-border-animate' : ''
-                }`}
-                onClick={() => navigate(`/shop/${shop.id}`)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
-                    {/* Rank */}
-                    <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
-                      {getRankIcon(index + 1)}
-                    </div>
+              <ScrollReveal key={shop.id} delay={Math.min(index * 60, 600)}>
+                <Card
+                  className={`cursor-pointer transition-all glass-card ${
+                    index < 3 ? 'neon-border-animate' : ''
+                  }`}
+                  onClick={() => navigate(`/shop/${shop.id}`)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                      {/* Rank */}
+                      <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+                        {getRankIcon(index + 1)}
+                      </div>
 
-                    {/* Shop Image */}
-                    <div className="flex-shrink-0">
-                      {shop.shop_image_url ? (
-                        <img
-                          src={shop.shop_image_url}
-                          alt={shop.name}
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-lg bg-secondary flex items-center justify-center">
-                          <Leaf className="h-6 w-6 text-muted-foreground" />
+                      {/* Shop Image */}
+                      <div className="flex-shrink-0">
+                        {shop.shop_image_url ? (
+                          <img
+                            src={shop.shop_image_url}
+                            alt={shop.name}
+                            className="w-12 h-12 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-secondary flex items-center justify-center">
+                            <Leaf className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Shop Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-foreground truncate">{shop.name}</h3>
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <MapPin className="h-3 w-3" />
+                          <span className="truncate">{shop.address}</span>
                         </div>
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Shop Info */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground truncate">{shop.name}</h3>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <MapPin className="h-3 w-3" />
-                        <span className="truncate">{shop.address}</span>
+                      {/* Score */}
+                      <div className="flex-shrink-0 text-right">
+                        <div
+                          className={`text-2xl font-bold ${getGradeColor(Number(shop.green_score))}`}
+                          style={{
+                            textShadow: Number(shop.green_score) >= 85
+                              ? '0 0 10px hsla(142, 71%, 45%, 0.4)'
+                              : 'none',
+                          }}
+                        >
+                          {Math.round(Number(shop.green_score))}
+                        </div>
+                        <div className={`text-xs font-medium ${getGradeColor(Number(shop.green_score))}`}>
+                          Grade {getGrade(Number(shop.green_score))}
+                        </div>
                       </div>
                     </div>
-
-                    {/* Score */}
-                    <div className="flex-shrink-0 text-right">
-                      <div
-                        className={`text-2xl font-bold ${getGradeColor(Number(shop.green_score))}`}
-                        style={{
-                          textShadow: Number(shop.green_score) >= 85
-                            ? '0 0 10px hsla(142, 71%, 45%, 0.4)'
-                            : 'none',
-                        }}
-                      >
-                        {Math.round(Number(shop.green_score))}
-                      </div>
-                      <div className={`text-xs font-medium ${getGradeColor(Number(shop.green_score))}`}>
-                        Grade {getGrade(Number(shop.green_score))}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
             ))}
           </div>
         )}

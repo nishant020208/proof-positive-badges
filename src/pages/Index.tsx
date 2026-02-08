@@ -7,6 +7,8 @@ import { db } from '@/lib/firebase';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { GreenScoreRing } from '@/components/GreenScoreRing';
+import { AnimatedCounter } from '@/components/AnimatedCounter';
+import { ScrollReveal } from '@/components/ScrollReveal';
 import { 
   Search, Leaf, MapPin, TrendingUp, Award, Users, 
   CheckCircle, ArrowRight, Sparkles, Shield, Zap
@@ -147,98 +149,104 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-8 border-y" style={{ borderColor: 'hsla(142, 71%, 45%, 0.1)', background: 'hsla(222, 40%, 10%, 0.3)' }}>
-        <div className="container">
-          <div className="grid grid-cols-3 gap-6 max-w-2xl mx-auto">
-            {[
-              { value: stats.shops, label: 'Verified Shops', icon: CheckCircle, color: 'primary' },
-              { value: stats.badges, label: 'Eco Badges', icon: Award, color: 'accent' },
-              { value: stats.votes, label: 'Votes Cast', icon: Users, color: 'primary' },
-            ].map((stat, i) => (
-              <div key={i} className="text-center animate-count" style={{ animationDelay: `${i * 0.15}s` }}>
-                <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl mb-2 ${
-                  stat.color === 'accent' ? 'bg-accent/10' : 'bg-primary/10'
-                }`}>
-                  <stat.icon className={`h-5 w-5 ${stat.color === 'accent' ? 'text-accent' : 'text-primary'}`} />
+      {/* Stats Section with Animated Counters */}
+      <ScrollReveal>
+        <section className="py-8 border-y" style={{ borderColor: 'hsla(142, 71%, 45%, 0.1)', background: 'hsla(222, 40%, 10%, 0.3)' }}>
+          <div className="container">
+            <div className="grid grid-cols-3 gap-6 max-w-2xl mx-auto">
+              {[
+                { value: stats.shops, label: 'Verified Shops', icon: CheckCircle, color: 'primary' },
+                { value: stats.badges, label: 'Eco Badges', icon: Award, color: 'accent' },
+                { value: stats.votes, label: 'Votes Cast', icon: Users, color: 'primary' },
+              ].map((stat, i) => (
+                <div key={i} className="text-center">
+                  <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl mb-2 ${
+                    stat.color === 'accent' ? 'bg-accent/10' : 'bg-primary/10'
+                  }`}>
+                    <stat.icon className={`h-5 w-5 ${stat.color === 'accent' ? 'text-accent' : 'text-primary'}`} />
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-foreground">
+                    <AnimatedCounter value={stat.value} duration={1500 + i * 300} />
+                  </p>
+                  <p className="text-xs md:text-sm text-muted-foreground">{stat.label}</p>
                 </div>
-                <p className="text-2xl md:text-3xl font-bold text-foreground">{stat.value}</p>
-                <p className="text-xs md:text-sm text-muted-foreground">{stat.label}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </ScrollReveal>
 
       {/* Top Shops */}
       {topShops.length > 0 && (
         <section className="py-12 md:py-16">
           <div className="container">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground">
-                  Top <span className="gradient-text">Green Champions</span>
-                </h2>
-                <p className="text-muted-foreground mt-1">Highest rated eco-friendly shops</p>
+            <ScrollReveal>
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground">
+                    Top <span className="gradient-text">Green Champions</span>
+                  </h2>
+                  <p className="text-muted-foreground mt-1">Highest rated eco-friendly shops</p>
+                </div>
+                <Button variant="ghost" className="gap-2 text-primary hover:bg-primary/10" onClick={() => navigate('/leaderboard')}>
+                  View All <ArrowRight className="h-4 w-4" />
+                </Button>
               </div>
-              <Button variant="ghost" className="gap-2 text-primary hover:bg-primary/10" onClick={() => navigate('/leaderboard')}>
-                View All <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
+            </ScrollReveal>
 
             <div className="grid md:grid-cols-3 gap-6">
               {topShops.map((shop, index) => (
-                <div
-                  key={shop.id}
-                  className={`group relative glass-card card-hover cursor-pointer overflow-hidden ${
-                    index === 0 ? 'rank-1' : ''
-                  }`}
-                  onClick={() => navigate(`/shop/${shop.id}`)}
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
-                  {/* Rank Badge */}
-                  <div className={`absolute top-4 left-4 z-10 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-lg ${
-                    index === 0 ? 'badge-level-gold' : 
-                    index === 1 ? 'badge-level-silver' : 
-                    'badge-level-bronze'
-                  }`}>
-                    #{index + 1}
-                  </div>
+                <ScrollReveal key={shop.id} delay={index * 150}>
+                  <div
+                    className={`group relative glass-card card-hover cursor-pointer overflow-hidden ${
+                      index === 0 ? 'rank-1' : ''
+                    }`}
+                    onClick={() => navigate(`/shop/${shop.id}`)}
+                  >
+                    {/* Rank Badge */}
+                    <div className={`absolute top-4 left-4 z-10 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-lg ${
+                      index === 0 ? 'badge-level-gold' : 
+                      index === 1 ? 'badge-level-silver' : 
+                      'badge-level-bronze'
+                    }`}>
+                      #{index + 1}
+                    </div>
 
-                  {/* Image */}
-                  <div className="h-48 overflow-hidden">
-                    {shop.shopImageUrl ? (
-                      <img
-                        src={shop.shopImageUrl}
-                        alt={shop.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, hsla(142, 71%, 45%, 0.1), hsla(183, 100%, 50%, 0.05))' }}>
-                        <Leaf className="h-16 w-16 text-primary/20" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
-                  </div>
-
-                  {/* Content */}
-                  <div className="absolute bottom-0 left-0 right-0 p-5">
-                    <div className="flex items-end justify-between">
-                      <div className="flex-1 min-w-0 pr-4">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-display font-semibold text-lg text-foreground truncate">
-                            {shop.name}
-                          </h3>
-                          {shop.isVerified && (
-                            <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
-                          )}
+                    {/* Image */}
+                    <div className="h-48 overflow-hidden">
+                      {shop.shopImageUrl ? (
+                        <img
+                          src={shop.shopImageUrl}
+                          alt={shop.name}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, hsla(142, 71%, 45%, 0.1), hsla(183, 100%, 50%, 0.05))' }}>
+                          <Leaf className="h-16 w-16 text-primary/20" />
                         </div>
-                        <p className="text-sm text-muted-foreground truncate">{shop.address}</p>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+                    </div>
+
+                    {/* Content */}
+                    <div className="absolute bottom-0 left-0 right-0 p-5">
+                      <div className="flex items-end justify-between">
+                        <div className="flex-1 min-w-0 pr-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-display font-semibold text-lg text-foreground truncate">
+                              {shop.name}
+                            </h3>
+                            {shop.isVerified && (
+                              <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">{shop.address}</p>
+                        </div>
+                        <GreenScoreRing score={Math.round(Number(shop.greenScore) || 0)} size="md" />
                       </div>
-                      <GreenScoreRing score={Math.round(Number(shop.greenScore) || 0)} size="md" />
                     </div>
                   </div>
-                </div>
+                </ScrollReveal>
               ))}
             </div>
           </div>
@@ -249,43 +257,46 @@ const Index = () => {
       {otherShops.length > 0 && (
         <section className="py-12" style={{ background: 'hsla(222, 40%, 8%, 0.5)' }}>
           <div className="container">
-            <h2 className="font-display text-xl md:text-2xl font-bold mb-6 text-foreground">All Verified Shops</h2>
+            <ScrollReveal>
+              <h2 className="font-display text-xl md:text-2xl font-bold mb-6 text-foreground">All Verified Shops</h2>
+            </ScrollReveal>
             
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {otherShops.map((shop) => (
-                <div
-                  key={shop.id}
-                  className="group glass-card p-4 cursor-pointer"
-                  onClick={() => navigate(`/shop/${shop.id}`)}
-                >
-                  <div className="flex items-start gap-4">
-                    {shop.shopImageUrl ? (
-                      <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0">
-                        <img
-                          src={shop.shopImageUrl}
-                          alt={shop.name}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                        />
+              {otherShops.map((shop, index) => (
+                <ScrollReveal key={shop.id} delay={index * 80}>
+                  <div
+                    className="group glass-card p-4 cursor-pointer"
+                    onClick={() => navigate(`/shop/${shop.id}`)}
+                  >
+                    <div className="flex items-start gap-4">
+                      {shop.shopImageUrl ? (
+                        <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0">
+                          <img
+                            src={shop.shopImageUrl}
+                            alt={shop.name}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Leaf className="h-6 w-6 text-primary" />
+                        </div>
+                      )}
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="font-semibold truncate text-foreground">{shop.name}</h3>
+                          {shop.isVerified && (
+                            <CheckCircle className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">{shop.address}</p>
                       </div>
-                    ) : (
-                      <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Leaf className="h-6 w-6 text-primary" />
-                      </div>
-                    )}
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="font-semibold truncate text-foreground">{shop.name}</h3>
-                        {shop.isVerified && (
-                          <CheckCircle className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground truncate">{shop.address}</p>
-                    </div>
 
-                    <GreenScoreRing score={Math.round(Number(shop.greenScore) || 0)} size="sm" />
+                      <GreenScoreRing score={Math.round(Number(shop.greenScore) || 0)} size="sm" />
+                    </div>
                   </div>
-                </div>
+                </ScrollReveal>
               ))}
             </div>
           </div>
@@ -325,45 +336,47 @@ const Index = () => {
 
       {/* CTA Section */}
       {!user && (
-        <section className="py-16 md:py-20">
-          <div className="container">
-            <div className="relative overflow-hidden rounded-3xl p-8 md:p-12" style={{ background: 'linear-gradient(135deg, hsla(142, 71%, 45%, 0.15), hsla(183, 100%, 50%, 0.08))', border: '1px solid hsla(142, 71%, 45%, 0.15)' }}>
-              <div className="hero-orb w-64 h-64 -top-32 -right-32 opacity-40" style={{ background: 'hsla(142, 71%, 45%, 0.2)' }} />
-              <div className="relative max-w-2xl mx-auto text-center">
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-6">
-                  <Shield className="w-4 h-4" />
-                  <span className="text-sm font-medium">Join 500+ Eco Warriors</span>
-                </div>
-                
-                <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-                  Start Verifying <span className="gradient-text">Green Shops</span> Today
-                </h2>
-                <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
-                  Your votes with photo proof help build transparent, eco-friendly commerce in your community.
-                </p>
-                
-                <div className="flex flex-wrap gap-4 justify-center">
-                  <Button 
-                    size="lg" 
-                    className="gap-2 rounded-xl eco-gradient glow-eco"
-                    onClick={() => navigate('/auth')}
-                  >
-                    <Zap className="h-5 w-5" />
-                    Create Account
-                  </Button>
-                  <Button 
-                    size="lg" 
-                    variant="outline"
-                    className="gap-2 rounded-xl border-primary/30 hover:bg-primary/10"
-                    onClick={() => navigate('/auth?role=shop_owner')}
-                  >
-                    I'm a Shop Owner
-                  </Button>
+        <ScrollReveal>
+          <section className="py-16 md:py-20">
+            <div className="container">
+              <div className="relative overflow-hidden rounded-3xl p-8 md:p-12" style={{ background: 'linear-gradient(135deg, hsla(142, 71%, 45%, 0.15), hsla(183, 100%, 50%, 0.08))', border: '1px solid hsla(142, 71%, 45%, 0.15)' }}>
+                <div className="hero-orb w-64 h-64 -top-32 -right-32 opacity-40" style={{ background: 'hsla(142, 71%, 45%, 0.2)' }} />
+                <div className="relative max-w-2xl mx-auto text-center">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-6">
+                    <Shield className="w-4 h-4" />
+                    <span className="text-sm font-medium">Join 500+ Eco Warriors</span>
+                  </div>
+                  
+                  <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
+                    Start Verifying <span className="gradient-text">Green Shops</span> Today
+                  </h2>
+                  <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
+                    Your votes with photo proof help build transparent, eco-friendly commerce in your community.
+                  </p>
+                  
+                  <div className="flex flex-wrap gap-4 justify-center">
+                    <Button 
+                      size="lg" 
+                      className="gap-2 rounded-xl eco-gradient glow-eco"
+                      onClick={() => navigate('/auth')}
+                    >
+                      <Zap className="h-5 w-5" />
+                      Create Account
+                    </Button>
+                    <Button 
+                      size="lg" 
+                      variant="outline"
+                      className="gap-2 rounded-xl border-primary/30 hover:bg-primary/10"
+                      onClick={() => navigate('/auth?role=shop_owner')}
+                    >
+                      I'm a Shop Owner
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </ScrollReveal>
       )}
 
       {/* Footer */}
