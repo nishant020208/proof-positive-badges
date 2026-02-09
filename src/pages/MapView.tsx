@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useShops, Shop } from '@/hooks/useShops';
 import { AppHeader } from '@/components/AppHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { MapPin, Navigation, Leaf, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 const defaultCenter: [number, number] = [20.5937, 78.9629];
 
@@ -40,51 +39,21 @@ function createCustomIcon(score: number) {
   });
 }
 
-// Component to fit map bounds
-function FitBounds({ shops, userLocation }: { shops: Shop[]; userLocation: [number, number] | null }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (shops.length > 0) {
-      const bounds = L.latLngBounds(
-        shops.map(s => [s.latitude, s.longitude] as [number, number])
-      );
-      if (userLocation) bounds.extend(userLocation);
-      map.fitBounds(bounds, { padding: [40, 40] });
-    } else if (userLocation) {
-      map.setView(userLocation, 13);
-    }
-  }, [shops, userLocation, map]);
-
-  return null;
-}
-
-// Component to pan to selected shop
-function PanToShop({ shop }: { shop: Shop | null }) {
-  const map = useMap();
-  useEffect(() => {
-    if (shop) {
-      map.setView([shop.latitude, shop.longitude], 15, { animate: true });
-    }
-  }, [shop, map]);
-  return null;
-}
-
 export default function MapView() {
   const navigate = useNavigate();
   const { shops, loading } = useShops();
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const markersRef = useRef<L.Marker[]>([]);
 
+  // Get user location
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation([position.coords.latitude, position.coords.longitude]);
-        },
-        () => {
-          setUserLocation(defaultCenter);
-        }
+        (pos) => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
+        () => setUserLocation(defaultCenter)
       );
     }
   }, []);
@@ -100,21 +69,113 @@ export default function MapView() {
       const dLat = ((lat2 - lat1) * Math.PI) / 180;
       const dLng = ((lng2 - lng1) * Math.PI) / 180;
       const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.sin(dLat / 2) ** 2 +
         Math.cos((lat1 * Math.PI) / 180) *
           Math.cos((lat2 * Math.PI) / 180) *
-          Math.sin(dLng / 2) *
-          Math.sin(dLng / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return R * c;
+          Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     },
     []
   );
 
-  const center = useMemo(
-    () => userLocation || defaultCenter,
-    [userLocation]
-  );
+  // Initialize map
+  useEffect(() => {
+    if (loading || !mapContainerRef.current || mapRef.current) return;
+
+    const center = userLocation || defaultCenter;
+    const map = L.map(mapContainerRef.current, {
+      center,
+      zoom: 12,
+      zoomControl: true,
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    // User location blue dot
+    if (userLocation) {
+      L.circleMarker(userLocation, {
+        radius: 8,
+        color: '#3b82f6',
+        fillColor: '#3b82f6',
+        fillOpacity: 1,
+        weight: 3,
+      }).addTo(map);
+    }
+
+    // Shop markers
+    const markers: L.Marker[] = [];
+    verifiedShops.forEach((shop) => {
+      const marker = L.marker([shop.latitude, shop.longitude], {
+        icon: createCustomIcon(Number(shop.green_score)),
+      }).addTo(map);
+
+      const dist = userLocation
+        ? calculateDistance(userLocation[0], userLocation[1], shop.latitude, shop.longitude).toFixed(1)
+        : null;
+
+      const popupHtml = `
+        <div style="min-width:200px;font-family:sans-serif;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${
+              shop.shop_image_url
+                ? `<img src="${shop.shop_image_url}" alt="${shop.name}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;"/>`
+                : `<div style="width:48px;height:48px;border-radius:8px;background:hsla(142,71%,45%,0.15);display:flex;align-items:center;justify-content:center;">🌿</div>`
+            }
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${shop.name}</div>
+              <div style="font-size:11px;opacity:0.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${shop.address}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.1);">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:${getScoreColor(Number(shop.green_score))};color:#fff;font-size:11px;font-weight:700;">${Math.round(Number(shop.green_score))}</span>
+              <span style="font-size:11px;opacity:0.6;">Grade ${getGrade(Number(shop.green_score))}</span>
+            </div>
+            ${dist ? `<span style="font-size:11px;opacity:0.5;">${dist} km</span>` : ''}
+          </div>
+          <button onclick="window.__navigateToShop('${shop.id}')" style="margin-top:8px;width:100%;font-size:12px;font-weight:500;padding:6px 12px;border-radius:6px;border:none;cursor:pointer;background:${getScoreColor(Number(shop.green_score))};color:#fff;">
+            View Details →
+          </button>
+        </div>
+      `;
+
+      marker.bindPopup(popupHtml);
+      marker.on('click', () => setSelectedShop(shop));
+      markers.push(marker);
+    });
+    markersRef.current = markers;
+
+    // Fit bounds
+    if (verifiedShops.length > 0) {
+      const bounds = L.latLngBounds(verifiedShops.map((s) => [s.latitude, s.longitude] as [number, number]));
+      if (userLocation) bounds.extend(userLocation);
+      map.fitBounds(bounds, { padding: [40, 40] });
+    } else if (userLocation) {
+      map.setView(userLocation, 13);
+    }
+
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, [loading, verifiedShops, userLocation, calculateDistance]);
+
+  // Navigation helper for popup buttons
+  useEffect(() => {
+    (window as any).__navigateToShop = (id: string) => navigate(`/shop/${id}`);
+    return () => { delete (window as any).__navigateToShop; };
+  }, [navigate]);
+
+  // Pan to selected shop
+  useEffect(() => {
+    if (selectedShop && mapRef.current) {
+      mapRef.current.setView([selectedShop.latitude, selectedShop.longitude], 15, { animate: true });
+    }
+  }, [selectedShop]);
 
   return (
     <div className="min-h-screen vardant-bg flex flex-col">
@@ -131,102 +192,7 @@ export default function MapView() {
               </div>
             </div>
           ) : (
-            <MapContainer
-              center={center}
-              zoom={12}
-              style={{ width: '100%', height: '100%' }}
-              zoomControl={true}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-              />
-
-              <FitBounds shops={verifiedShops} userLocation={userLocation} />
-              <PanToShop shop={selectedShop} />
-
-              {/* User location */}
-              {userLocation && (
-                <CircleMarker
-                  center={userLocation}
-                  radius={8}
-                  pathOptions={{
-                    color: '#3b82f6',
-                    fillColor: '#3b82f6',
-                    fillOpacity: 1,
-                    weight: 3,
-                  }}
-                />
-              )}
-
-              {/* Shop markers */}
-              {verifiedShops.map((shop) => (
-                <Marker
-                  key={shop.id}
-                  position={[shop.latitude, shop.longitude]}
-                  icon={createCustomIcon(Number(shop.green_score))}
-                  eventHandlers={{
-                    click: () => setSelectedShop(shop),
-                  }}
-                >
-                  <Popup>
-                    <div className="min-w-[200px]">
-                      <div className="flex items-center gap-3">
-                        {shop.shop_image_url ? (
-                          <img
-                            src={shop.shop_image_url}
-                            alt={shop.name}
-                            className="w-12 h-12 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ background: 'hsla(142, 71%, 45%, 0.1)' }}>
-                            <Leaf className="h-5 w-5" style={{ color: 'hsl(142, 71%, 45%)' }} />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-sm truncate">{shop.name}</h3>
-                          <p className="text-xs opacity-70 truncate">{shop.address}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid hsla(0,0%,100%,0.1)' }}>
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold"
-                            style={{
-                              backgroundColor: getScoreColor(Number(shop.green_score)),
-                              color: '#fff',
-                            }}
-                          >
-                            {Math.round(Number(shop.green_score))}
-                          </span>
-                          <span className="text-xs opacity-60">
-                            Grade {getGrade(Number(shop.green_score))}
-                          </span>
-                        </div>
-                        {userLocation && (
-                          <span className="text-xs opacity-50">
-                            {calculateDistance(
-                              userLocation[0], userLocation[1],
-                              shop.latitude, shop.longitude
-                            ).toFixed(1)} km
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => navigate(`/shop/${shop.id}`)}
-                        className="mt-2 w-full text-xs font-medium py-1.5 px-3 rounded-md"
-                        style={{
-                          backgroundColor: getScoreColor(Number(shop.green_score)),
-                          color: '#fff',
-                        }}
-                      >
-                        View Details →
-                      </button>
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
-            </MapContainer>
+            <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
           )}
         </div>
 
