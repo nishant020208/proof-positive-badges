@@ -198,6 +198,16 @@ export default function AddShop() {
     }
   };
 
+  // Upload with timeout to prevent hanging
+  const uploadWithTimeout = async (file: File, path: string, timeoutMs = 30000): Promise<string> => {
+    return Promise.race([
+      uploadFile(file, path),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Upload timed out after ${timeoutMs / 1000}s. Please check your connection.`)), timeoutMs)
+      ),
+    ]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm() || !user || isSubmitting) return;
@@ -205,17 +215,40 @@ export default function AddShop() {
     setIsSubmitting(true);
 
     try {
-      // Upload files in parallel for speed
-      const uploads = await Promise.all([
-        shopImage ? uploadFile(shopImage, `shops/${user.uid}/${Date.now()}-shop.${shopImage.name.split('.').pop()}`) : Promise.resolve(null),
-        certificate ? uploadFile(certificate, `certificates/${user.uid}/${Date.now()}-cert.${certificate.name.split('.').pop()}`) : Promise.resolve(null),
-        license ? uploadFile(license, `licenses/${user.uid}/${Date.now()}-license.${license.name.split('.').pop()}`) : Promise.resolve(null),
-      ]);
+      // Upload files in parallel with timeout protection
+      const uploadPromises: Promise<string | null>[] = [];
 
-      const [shopImageUrl, certificateUrl, licenseUrl] = uploads;
+      if (shopImage) {
+        uploadPromises.push(
+          uploadWithTimeout(shopImage, `shops/${user.uid}/${Date.now()}-shop.${shopImage.name.split('.').pop()}`)
+            .catch((err) => { console.error('Shop image upload failed:', err); return null; })
+        );
+      } else {
+        uploadPromises.push(Promise.resolve(null));
+      }
+
+      if (certificate) {
+        uploadPromises.push(
+          uploadWithTimeout(certificate, `certificates/${user.uid}/${Date.now()}-cert.${certificate.name.split('.').pop()}`)
+            .catch((err) => { console.error('Certificate upload failed:', err); return null; })
+        );
+      } else {
+        uploadPromises.push(Promise.resolve(null));
+      }
+
+      if (license) {
+        uploadPromises.push(
+          uploadWithTimeout(license, `licenses/${user.uid}/${Date.now()}-license.${license.name.split('.').pop()}`)
+            .catch((err) => { console.error('License upload failed:', err); return null; })
+        );
+      } else {
+        uploadPromises.push(Promise.resolve(null));
+      }
+
+      const [shopImageUrl, certificateUrl, licenseUrl] = await Promise.all(uploadPromises);
 
       if (!shopImageUrl) {
-        toast.error('Failed to upload shop image. Please try again.');
+        toast.error('Failed to upload shop image. Please check Firebase Storage permissions and try again.');
         setIsSubmitting(false);
         return;
       }
@@ -244,11 +277,18 @@ export default function AddShop() {
         socialLinks: null,
       });
 
-      toast.success('Shop registered successfully!');
+      toast.success('Shop registered successfully! 🎉');
       navigate('/dashboard');
-    } catch (err) {
-      toast.error('Registration failed. Please try again.');
-      console.error(err);
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      const message = err?.message || 'Registration failed.';
+      if (message.includes('storage') || message.includes('Storage') || message.includes('permission') || message.includes('unauthorized')) {
+        toast.error('File upload failed: Storage permissions issue. Please contact support.');
+      } else if (message.includes('timed out')) {
+        toast.error(message);
+      } else {
+        toast.error(`Registration failed: ${message}`);
+      }
     } finally {
       setIsSubmitting(false);
     }

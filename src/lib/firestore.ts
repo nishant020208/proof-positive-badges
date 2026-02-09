@@ -230,24 +230,36 @@ export const createVote = async (voteData: Omit<Vote, 'id' | 'createdAt'>): Prom
 };
 
 // Recalculate green score
+// Formula: GreenScore = sum of (eligible badge percentage / 100 * 5) for all 20 badges
+// Each badge contributes max 5 points (100 / 20 = 5), total max = 100
+// Level multiplier: Gold=1.0, Silver=0.85, Bronze=0.7, None=0
+const TOTAL_BADGES = 20;
+const POINTS_PER_BADGE = 100 / TOTAL_BADGES; // 5
+
 const recalculateGreenScore = async (shopId: string): Promise<void> => {
   const badges = await getShopBadges(shopId);
   
-  if (badges.length === 0) return;
-  
-  const eligibleBadges = badges.filter(b => b.isEligible);
-  if (eligibleBadges.length === 0) {
-    await updateDoc(doc(db, 'shops', shopId), { greenScore: 0 });
+  if (badges.length === 0) {
+    await updateDoc(doc(db, 'shops', shopId), { greenScore: 0, updatedAt: serverTimestamp() });
     return;
   }
   
-  const score = eligibleBadges.reduce((sum, badge) => {
-    const levelPoints = badge.level === 'gold' ? 5 : badge.level === 'silver' ? 3 : badge.level === 'bronze' ? 1 : 0;
-    return sum + (levelPoints * badge.percentage);
-  }, 0) / eligibleBadges.length / 100 * 100;
+  const score = badges.reduce((sum, badge) => {
+    if (!badge.isEligible) return sum;
+    
+    const levelMultiplier = 
+      badge.level === 'gold' ? 1.0 :
+      badge.level === 'silver' ? 0.85 :
+      badge.level === 'bronze' ? 0.7 : 0;
+    
+    return sum + (badge.percentage / 100) * POINTS_PER_BADGE * levelMultiplier;
+  }, 0);
+  
+  // Clamp to 0-100
+  const finalScore = Math.min(100, Math.max(0, Math.round(score)));
   
   await updateDoc(doc(db, 'shops', shopId), { 
-    greenScore: Math.round(score),
+    greenScore: finalScore,
     updatedAt: serverTimestamp(),
   });
 };
