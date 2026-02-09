@@ -5,7 +5,9 @@ import 'leaflet/dist/leaflet.css';
 import { useShops, Shop } from '@/hooks/useShops';
 import { AppHeader } from '@/components/AppHeader';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Navigation, Leaf, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { MapPin, Navigation, Leaf, Loader2, Search, SlidersHorizontal, X } from 'lucide-react';
 
 const defaultCenter: [number, number] = [20.5937, 78.9629];
 
@@ -39,6 +41,13 @@ function createCustomIcon(score: number) {
   });
 }
 
+const SCORE_FILTERS = [
+  { label: 'All', min: 0, max: 100 },
+  { label: 'A (85+)', min: 85, max: 100 },
+  { label: 'B (50-84)', min: 50, max: 84 },
+  { label: 'C (<50)', min: 0, max: 49 },
+];
+
 export default function MapView() {
   const navigate = useNavigate();
   const { shops, loading } = useShops();
@@ -47,6 +56,11 @@ export default function MapView() {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
+
+  // Search & filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeScoreFilter, setActiveScoreFilter] = useState(0); // index into SCORE_FILTERS
+  const [showFilters, setShowFilters] = useState(false);
 
   // Get user location
   useEffect(() => {
@@ -62,6 +76,19 @@ export default function MapView() {
     () => shops.filter((shop) => shop.is_verified),
     [shops]
   );
+
+  // Filtered shops
+  const filteredShops = useMemo(() => {
+    const filter = SCORE_FILTERS[activeScoreFilter];
+    return verifiedShops.filter((shop) => {
+      const score = Number(shop.green_score);
+      const matchesScore = score >= filter.min && score <= filter.max;
+      const matchesSearch = searchQuery.trim() === '' ||
+        shop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        shop.address.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesScore && matchesSearch;
+    });
+  }, [verifiedShops, activeScoreFilter, searchQuery]);
 
   const calculateDistance = useCallback(
     (lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -104,9 +131,30 @@ export default function MapView() {
       }).addTo(map);
     }
 
-    // Shop markers
+    if (userLocation) {
+      map.setView(userLocation, 13);
+    }
+
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, [loading, userLocation]);
+
+  // Update markers when filteredShops change
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Remove existing markers
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    // Add new markers
     const markers: L.Marker[] = [];
-    verifiedShops.forEach((shop) => {
+    filteredShops.forEach((shop) => {
       const marker = L.marker([shop.latitude, shop.longitude], {
         icon: createCustomIcon(Number(shop.green_score)),
       }).addTo(map);
@@ -147,22 +195,13 @@ export default function MapView() {
     });
     markersRef.current = markers;
 
-    // Fit bounds
-    if (verifiedShops.length > 0) {
-      const bounds = L.latLngBounds(verifiedShops.map((s) => [s.latitude, s.longitude] as [number, number]));
+    // Fit bounds to filtered shops
+    if (filteredShops.length > 0) {
+      const bounds = L.latLngBounds(filteredShops.map((s) => [s.latitude, s.longitude] as [number, number]));
       if (userLocation) bounds.extend(userLocation);
       map.fitBounds(bounds, { padding: [40, 40] });
-    } else if (userLocation) {
-      map.setView(userLocation, 13);
     }
-
-    mapRef.current = map;
-
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
-  }, [loading, verifiedShops, userLocation, calculateDistance]);
+  }, [filteredShops, userLocation, calculateDistance]);
 
   // Navigation helper for popup buttons
   useEffect(() => {
@@ -182,8 +221,55 @@ export default function MapView() {
       <AppHeader />
 
       <main className="flex-1 flex flex-col">
-        {/* Map */}
-        <div className="relative h-[55vh] md:h-[60vh] w-full">
+        {/* Search & Filter Controls */}
+        <div className="container py-3 space-y-2 relative z-10">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search shops by name or address..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 bg-secondary/60 border-border h-10"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <Button
+              variant={showFilters ? 'default' : 'outline'}
+              size="icon"
+              className={`h-10 w-10 shrink-0 ${showFilters ? 'eco-gradient' : 'border-border'}`}
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {showFilters && (
+            <div className="flex gap-2 flex-wrap animate-slide-up">
+              {SCORE_FILTERS.map((filter, idx) => (
+                <Button
+                  key={filter.label}
+                  size="sm"
+                  variant={activeScoreFilter === idx ? 'default' : 'outline'}
+                  className={`text-xs ${activeScoreFilter === idx ? 'eco-gradient' : 'border-border'}`}
+                  onClick={() => setActiveScoreFilter(idx)}
+                >
+                  {filter.label}
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Map - contained stacking context so Leaflet z-indices don't escape */}
+        <div className="relative h-[50vh] md:h-[55vh] w-full" style={{ zIndex: 0, isolation: 'isolate' }}>
           {loading ? (
             <div className="h-full flex items-center justify-center bg-secondary/50">
               <div className="text-center">
@@ -200,18 +286,34 @@ export default function MapView() {
         <div className="container py-4 flex-1">
           <h2 className="font-display text-lg font-bold mb-3 flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
-            <span className="gradient-text">Nearby Shops</span>
-            <span className="text-muted-foreground text-sm font-normal">({verifiedShops.length})</span>
+            <span className="gradient-text">
+              {searchQuery ? 'Search Results' : 'Nearby Shops'}
+            </span>
+            <span className="text-muted-foreground text-sm font-normal">({filteredShops.length})</span>
           </h2>
 
-          {verifiedShops.length === 0 && !loading ? (
+          {filteredShops.length === 0 && !loading ? (
             <div className="text-center py-8">
               <MapPin className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground text-sm">No verified shops found</p>
+              <p className="text-muted-foreground text-sm">
+                {searchQuery || activeScoreFilter > 0
+                  ? 'No shops match your filters'
+                  : 'No verified shops found'}
+              </p>
+              {(searchQuery || activeScoreFilter > 0) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 text-primary"
+                  onClick={() => { setSearchQuery(''); setActiveScoreFilter(0); }}
+                >
+                  Clear filters
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-2 pb-4">
-              {verifiedShops
+              {filteredShops
                 .map((shop) => ({
                   ...shop,
                   distance: userLocation
