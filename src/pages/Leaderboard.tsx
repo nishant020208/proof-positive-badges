@@ -49,13 +49,13 @@ export default function Leaderboard() {
 
   const filteredAndSortedShops = useMemo(() => {
     let filtered = shops.filter(shop => 
-      shop.is_verified && 
+      shop.isVerified && 
       shop.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     filtered.sort((a, b) => {
       if (sortBy === 'score') {
-        return Number(b.green_score) - Number(a.green_score);
+        return Number(b.greenScore) - Number(a.greenScore);
       }
       return a.name.localeCompare(b.name);
     });
@@ -81,8 +81,8 @@ export default function Leaderboard() {
           <div className="grid grid-cols-3 gap-4 mb-6">
             {[
               { value: filteredAndSortedShops.length, label: 'Verified Shops', glow: 'primary' },
-              { value: filteredAndSortedShops.filter(s => Number(s.green_score) >= 85).length, label: 'A+ Rated', glow: 'gold' },
-              { value: Math.round(filteredAndSortedShops.reduce((sum, s) => sum + Number(s.green_score), 0) / Math.max(filteredAndSortedShops.length, 1)), label: 'Avg Score', glow: 'accent' },
+              { value: filteredAndSortedShops.filter(s => Number(s.greenScore) >= 85).length, label: 'A+ Rated', glow: 'gold' },
+              { value: Math.round(filteredAndSortedShops.reduce((sum, s) => sum + Number(s.greenScore), 0) / Math.max(filteredAndSortedShops.length, 1)), label: 'Avg Score', glow: 'accent' },
             ].map((stat, i) => (
               <Card key={i} className="text-center p-4 glass-card stat-card">
                 <div className={`text-2xl font-bold ${
@@ -158,9 +158,9 @@ export default function Leaderboard() {
 
                       {/* Shop Image */}
                       <div className="flex-shrink-0">
-                        {shop.shop_image_url ? (
+                        {shop.shopImageUrl ? (
                           <img
-                            src={shop.shop_image_url}
+                            src={shop.shopImageUrl}
                             alt={shop.name}
                             className="w-12 h-12 rounded-lg object-cover"
                           />
@@ -183,17 +183,17 @@ export default function Leaderboard() {
                       {/* Score */}
                       <div className="flex-shrink-0 text-right">
                         <div
-                          className={`text-2xl font-bold ${getGradeColor(Number(shop.green_score))}`}
+                          className={`text-2xl font-bold ${getGradeColor(Number(shop.greenScore))}`}
                           style={{
-                            textShadow: Number(shop.green_score) >= 85
+                            textShadow: Number(shop.greenScore) >= 85
                               ? '0 0 10px hsla(142, 71%, 45%, 0.4)'
                               : 'none',
                           }}
                         >
-                          {Math.round(Number(shop.green_score))}
+                          {Math.round(Number(shop.greenScore))}
                         </div>
-                        <div className={`text-xs font-medium ${getGradeColor(Number(shop.green_score))}`}>
-                          Grade {getGrade(Number(shop.green_score))}
+                        <div className={`text-xs font-medium ${getGradeColor(Number(shop.greenScore))}`}>
+                          Grade {getGrade(Number(shop.greenScore))}
                         </div>
                       </div>
                     </div>

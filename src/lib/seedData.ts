@@ -1,7 +1,7 @@
 // Firebase Initialization Script
 // Run this once to seed the initial data into Firestore
 
-import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 
 // Badge definitions for the GreenScore system
@@ -40,6 +40,55 @@ export const OWNER_WHITELIST = [
   { email: 'test@owner.com', status: 'pending', addedBy: null, activatedAt: null },
 ];
 
+// Demo shops data
+const DEMO_SHOPS = [
+  {
+    name: 'Green Leaf Grocery',
+    description: 'Organic groceries, zero-waste refill station, and locally sourced produce. Leading the way in sustainable shopping since 2019.',
+    address: '123 MG Road, Indiranagar, Bengaluru',
+    latitude: 12.9716,
+    longitude: 77.6411,
+    greenScore: 78,
+    isVerified: true,
+    verificationStatus: 'verified',
+    tagline: 'Fresh. Local. Sustainable.',
+    shopImageUrl: null,
+    certificateUrl: null,
+    licenseUrl: null,
+    gstNumber: '29ABCDE1234F1Z5',
+  },
+  {
+    name: 'EcoMart Express',
+    description: 'Convenience store with a conscience. All digital billing, LED-only lighting, and biodegradable packaging for every item.',
+    address: '456 Park Street, Koramangala, Bengaluru',
+    latitude: 12.9352,
+    longitude: 77.6245,
+    greenScore: 62,
+    isVerified: true,
+    verificationStatus: 'verified',
+    tagline: 'Convenience meets eco-responsibility',
+    shopImageUrl: null,
+    certificateUrl: null,
+    licenseUrl: null,
+    gstNumber: '29FGHIJ5678K2Z8',
+  },
+  {
+    name: 'Pure Earth Organics',
+    description: 'Premium organic market with solar-powered operations, rainwater harvesting, and complete waste segregation. Award-winning eco store.',
+    address: '789 Church Street, MG Road, Bengaluru',
+    latitude: 12.9757,
+    longitude: 77.6033,
+    greenScore: 91,
+    isVerified: true,
+    verificationStatus: 'verified',
+    tagline: 'Nature\'s best, responsibly delivered',
+    shopImageUrl: null,
+    certificateUrl: null,
+    licenseUrl: null,
+    gstNumber: '29LMNOP9012Q3Z1',
+  },
+];
+
 // Seed badges
 export async function seedBadges() {
   console.log('Seeding badges...');
@@ -65,6 +114,48 @@ export async function seedOwnerWhitelist() {
   console.log('Owner whitelist seeded successfully!');
 }
 
+// Seed demo shops
+export async function seedDemoShops() {
+  console.log('Seeding demo shops...');
+  
+  const snapshot = await getDocs(collection(db, 'shops'));
+  if (!snapshot.empty) {
+    console.log('Shops already exist, skipping demo seed.');
+    return;
+  }
+
+  for (const shop of DEMO_SHOPS) {
+    const shopId = `demo-${shop.name.toLowerCase().replace(/\s+/g, '-')}`;
+    await setDoc(doc(db, 'shops', shopId), {
+      ownerId: 'demo-owner',
+      name: shop.name,
+      description: shop.description,
+      address: shop.address,
+      latitude: shop.latitude,
+      longitude: shop.longitude,
+      shopImageUrl: shop.shopImageUrl,
+      certificateUrl: shop.certificateUrl,
+      licenseUrl: shop.licenseUrl,
+      gstNumber: shop.gstNumber,
+      tagline: shop.tagline,
+      contactPhone: null,
+      contactEmail: null,
+      isVerified: shop.isVerified,
+      greenScore: shop.greenScore,
+      verificationStatus: shop.verificationStatus,
+      ownerVerified: true,
+      ownerVerifiedAt: null,
+      ownerVerifiedBy: null,
+      openingHours: null,
+      socialLinks: null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  console.log('Demo shops seeded successfully!');
+}
+
 // Check if badges exist
 export async function checkBadgesExist(): Promise<boolean> {
   const snapshot = await getDocs(collection(db, 'badges'));
@@ -78,8 +169,10 @@ export async function initializeFirestore() {
   if (!badgesExist) {
     await seedBadges();
     await seedOwnerWhitelist();
-    console.log('Firestore initialized with seed data!');
-  } else {
-    console.log('Firestore already has data, skipping seed.');
   }
+  
+  // Always try to seed demo shops if none exist
+  await seedDemoShops();
+  
+  console.log('Firestore initialization complete!');
 }
