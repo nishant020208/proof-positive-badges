@@ -73,7 +73,7 @@ export default function MapView() {
   }, []);
 
   const verifiedShops = useMemo(
-    () => shops.filter((shop) => shop.is_verified),
+    () => shops.filter((shop) => shop.isVerified),
     [shops]
   );
 
@@ -81,7 +81,7 @@ export default function MapView() {
   const filteredShops = useMemo(() => {
     const filter = SCORE_FILTERS[activeScoreFilter];
     return verifiedShops.filter((shop) => {
-      const score = Number(shop.green_score);
+      const score = Number(shop.greenScore);
       const matchesScore = score >= filter.min && score <= filter.max;
       const matchesSearch = searchQuery.trim() === '' ||
         shop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -156,7 +156,7 @@ export default function MapView() {
     const markers: L.Marker[] = [];
     filteredShops.forEach((shop) => {
       const marker = L.marker([shop.latitude, shop.longitude], {
-        icon: createCustomIcon(Number(shop.green_score)),
+        icon: createCustomIcon(Number(shop.greenScore)),
       }).addTo(map);
 
       const dist = userLocation
@@ -167,8 +167,8 @@ export default function MapView() {
         <div style="min-width:200px;font-family:sans-serif;">
           <div style="display:flex;align-items:center;gap:8px;">
             ${
-              shop.shop_image_url
-                ? `<img src="${shop.shop_image_url}" alt="${shop.name}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;"/>`
+              shop.shopImageUrl
+                ? `<img src="${shop.shopImageUrl}" alt="${shop.name}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;"/>`
                 : `<div style="width:48px;height:48px;border-radius:8px;background:hsla(142,71%,45%,0.15);display:flex;align-items:center;justify-content:center;">🌿</div>`
             }
             <div style="flex:1;min-width:0;">
@@ -178,12 +178,12 @@ export default function MapView() {
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.1);">
             <div style="display:flex;align-items:center;gap:6px;">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:${getScoreColor(Number(shop.green_score))};color:#fff;font-size:11px;font-weight:700;">${Math.round(Number(shop.green_score))}</span>
-              <span style="font-size:11px;opacity:0.6;">Grade ${getGrade(Number(shop.green_score))}</span>
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:${getScoreColor(Number(shop.greenScore))};color:#fff;font-size:11px;font-weight:700;">${Math.round(Number(shop.greenScore))}</span>
+              <span style="font-size:11px;opacity:0.6;">Grade ${getGrade(Number(shop.greenScore))}</span>
             </div>
             ${dist ? `<span style="font-size:11px;opacity:0.5;">${dist} km</span>` : ''}
           </div>
-          <button onclick="window.__navigateToShop('${shop.id}')" style="margin-top:8px;width:100%;font-size:12px;font-weight:500;padding:6px 12px;border-radius:6px;border:none;cursor:pointer;background:${getScoreColor(Number(shop.green_score))};color:#fff;">
+          <button onclick="window.__navigateToShop('${shop.id}')" style="margin-top:8px;width:100%;font-size:12px;font-weight:500;padding:6px 12px;border-radius:6px;border:none;cursor:pointer;background:${getScoreColor(Number(shop.greenScore))};color:#fff;">
             View Details →
           </button>
         </div>
@@ -331,9 +331,9 @@ export default function MapView() {
                   >
                     <CardContent className="p-3">
                       <div className="flex items-center gap-3">
-                        {shop.shop_image_url ? (
+                        {shop.shopImageUrl ? (
                           <img
-                            src={shop.shop_image_url}
+                            src={shop.shopImageUrl}
                             alt={shop.name}
                             className="w-11 h-11 rounded-lg object-cover flex-shrink-0"
                           />
@@ -356,12 +356,12 @@ export default function MapView() {
                         <div
                           className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
                           style={{
-                            backgroundColor: getScoreColor(Number(shop.green_score)),
+                            backgroundColor: getScoreColor(Number(shop.greenScore)),
                             color: '#fff',
-                            boxShadow: `0 0 12px ${getScoreColor(Number(shop.green_score))}40`,
+                            boxShadow: `0 0 12px ${getScoreColor(Number(shop.greenScore))}40`,
                           }}
                         >
-                          {Math.round(Number(shop.green_score))}
+                          {Math.round(Number(shop.greenScore))}
                         </div>
                       </div>
                     </CardContent>
